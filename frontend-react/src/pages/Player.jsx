@@ -1,0 +1,490 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, SkipForward } from 'lucide-react';
+import api from '../api/axios';
+import { fetchPlaybackInfo, resolveVideoUrl } from '../api/media';
+
+const Player = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const videoRef = useRef(null);
+  
+  const [movie, setMovie] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
+  const [isMuted, setIsMuted] = useState(false);
+  const [showControls, setShowControls] = useState(true);
+  const [showSkipIntro, setShowSkipIntro] = useState(false);
+  const [videoError, setVideoError] = useState('');
+  const [playbackHint, setPlaybackHint] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
+  
+  let controlsTimeout = null;
+  const historyRecorded = useRef(false);
+  const lastSaveRef = useRef(0);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setVideoError('');
+        const [movieRes, playRes] = await Promise.all([
+          api.get(`/movies/${id}`),
+          fetchPlaybackInfo(api, id),
+        ]);
+        setMovie(movieRes.data);
+        const play = playRes;
+        const base = typeof window !== 'undefined' ? window.location.origin : '';
+        setStreamUrl(play.streamUrl ? `${base}${play.streamUrl}` : resolveVideoUrl(movieRes.data));
+        setPlaybackHint(play.message || '');
+        if (!play.ready) {
+          setVideoError(play.message || 'Video not ready. Ask admin to Sync Movies.');
+        }
+      } catch (err) {
+        console.error(err);
+        setVideoError('Could not load movie. Is backend running?');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [id]);
+
+  useEffect(() => {
+    if (loading || !id) return;
+    api.get('/continue').then((res) => {
+      const item = res.data.find((c) => c.movieId === Number(id));
+      if (item && videoRef.current) {
+        videoRef.current.currentTime = item.progressSeconds;
+        setCurrentTime(item.progressSeconds);
+      }
+    }).catch(() => {});
+  }, [loading, id]);
+
+  const saveProgress = () => {
+    if (!videoRef.current || !id) return;
+    const progress = Math.floor(videoRef.current.currentTime);
+    const duration = Math.floor(videoRef.current.duration) || 0;
+    if (duration <= 0) return;
+    api.post(`/continue/${id}`, { progressSeconds: progress, durationSeconds: duration }).catch(() => {});
+  };
+
+  const recordHistoryOnce = () => {
+    if (historyRecorded.current) return;
+    historyRecorded.current = true;
+    api.post(`/history/${id}`).catch(() => {});
+  };
+
+  // Bind Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!videoRef.current || loading) return;
+
+      switch (e.key) {
+        case ' ': // Spacebar
+          e.preventDefault();
+          handlePlayPause();
+          break;
+        case 'ArrowLeft': // Seek back
+          e.preventDefault();
+          rewind();
+          break;
+        case 'ArrowRight': // Seek forward
+          e.preventDefault();
+          skipForward();
+          break;
+        case 'ArrowUp': // Volume up
+          e.preventDefault();
+          setVolume(prev => {
+            const next = Math.min(prev + 0.1, 1);
+            videoRef.current.volume = next;
+            return next;
+          });
+          break;
+        case 'ArrowDown': // Volume down
+          e.preventDefault();
+          setVolume(prev => {
+            const next = Math.max(prev - 0.1, 0);
+            videoRef.current.volume = next;
+            return next;
+          });
+          break;
+        case 'f':
+        case 'F': // Fullscreen
+          e.preventDefault();
+          handleFullscreen();
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, loading]);
+
+  // Handle playing state
+  const handlePlayPause = () => {
+    if (!videoRef.current) return;
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      videoRef.current.play();
+      setIsPlaying(true);
+      recordHistoryOnce();
+    }
+    handleMouseMove();
+  };
+
+  // Skip 10s forward
+  const skipForward = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime += 10;
+    }
+  };
+
+  // Rewind 10s backward
+  const rewind = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime -= 10;
+    }
+  };
+
+  // Handle progress/timeline tracking
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      const time = videoRef.current.currentTime;
+      setCurrentTime(time);
+      if (time - lastSaveRef.current >= 10) {
+        lastSaveRef.current = time;
+        saveProgress();
+      }
+      if (time >= 5 && time <= 25) {
+        setShowSkipIntro(true);
+      } else {
+        setShowSkipIntro(false);
+      }
+    }
+  };
+
+  const handleLoadedMetadata = () => {
+    if (videoRef.current) {
+      setDuration(videoRef.current.duration);
+    }
+  };
+
+  const handleSeek = (e) => {
+    const seekTime = parseFloat(e.target.value);
+    if (videoRef.current) {
+      videoRef.current.currentTime = seekTime;
+      setCurrentTime(seekTime);
+    }
+  };
+
+  // Mute toggle
+  const toggleMute = () => {
+    if (videoRef.current) {
+      const nextMuted = !isMuted;
+      videoRef.current.muted = nextMuted;
+      setIsMuted(nextMuted);
+    }
+  };
+
+  // Volume slider change
+  const handleVolumeChange = (e) => {
+    const vol = parseFloat(e.target.value);
+    setVolume(vol);
+    if (videoRef.current) {
+      videoRef.current.volume = vol;
+      videoRef.current.muted = vol === 0;
+      setIsMuted(vol === 0);
+    }
+  };
+
+  // Fullscreen trigger
+  const handleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      } else if (videoRef.current.webkitRequestFullscreen) { /* Safari */
+        videoRef.current.webkitRequestFullscreen();
+      } else if (videoRef.current.msRequestFullscreen) { /* IE11 */
+        videoRef.current.msRequestFullscreen();
+      }
+    }
+  };
+
+  const handleSkipIntroAction = () => {
+    if (videoRef.current) {
+      videoRef.current.currentTime = 30; // Skip straight past intro to 30s
+      setShowSkipIntro(false);
+    }
+  };
+
+  // Format seconds to MM:SS
+  const formatTime = (secs) => {
+    if (isNaN(secs)) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  // Auto hide controls when mouse stops moving
+  const handleMouseMove = () => {
+    setShowControls(true);
+    if (controlsTimeout) clearTimeout(controlsTimeout);
+    controlsTimeout = setTimeout(() => {
+      if (isPlaying) {
+        setShowControls(false);
+      }
+    }, 3000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimeout) clearTimeout(controlsTimeout);
+    };
+  }, []);
+
+  const activeVideoUrl = streamUrl || (movie ? resolveVideoUrl(movie) : '');
+
+  const handleVideoError = () => {
+    setVideoError(
+      playbackHint ||
+        'Cannot play video. Ask admin: copy H.264 MP4 to offline-import → Sync Movies.'
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="player-loading">
+        <div className="player-loading-bar" />
+        <p>Loading {movie?.title || 'movie'}...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      onMouseMove={handleMouseMove}
+      style={{
+        height: '100vh',
+        width: '100vw',
+        backgroundColor: '#000',
+        position: 'relative',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}
+    >
+      {videoError && (
+        <div style={{
+          position: 'absolute',
+          zIndex: 200,
+          background: 'rgba(0,0,0,0.85)',
+          padding: '24px 32px',
+          borderRadius: '8px',
+          maxWidth: '480px',
+          textAlign: 'center',
+          color: '#fff',
+        }}>
+          <p style={{ marginBottom: '16px' }}>{videoError}</p>
+          <button type="button" className="btn-primary" onClick={() => navigate(-1)}>Go back</button>
+        </div>
+      )}
+
+      <video
+        key={activeVideoUrl}
+        ref={videoRef}
+        src={activeVideoUrl}
+        autoPlay
+        controls={false}
+        playsInline
+        preload="auto"
+        onClick={handlePlayPause}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={() => {
+          setVideoError('');
+          handleLoadedMetadata();
+        }}
+        onError={handleVideoError}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'contain',
+          visibility: videoError ? 'hidden' : 'visible',
+        }}
+      />
+
+      {/* Back Button Overlay */}
+      {showControls && (
+        <div 
+          onClick={() => navigate(-1)}
+          style={{
+            position: 'absolute',
+            top: '40px',
+            left: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            color: '#fff',
+            cursor: 'pointer',
+            fontSize: '1.2rem',
+            fontWeight: '600',
+            zIndex: 100,
+            textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+            transition: 'opacity 0.3s ease'
+          }}
+        >
+          <ArrowLeft size={28} />
+          <span>Back to Browse</span>
+        </div>
+      )}
+
+      {/* Signature Netflix "Skip Intro" Overlay Button */}
+      {showSkipIntro && (
+        <button
+          onClick={handleSkipIntroAction}
+          style={{
+            position: 'absolute',
+            bottom: '120px',
+            right: '40px',
+            backgroundColor: 'rgba(20, 20, 20, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.4)',
+            color: '#fff',
+            fontSize: '1.1rem',
+            fontWeight: '600',
+            padding: '12px 24px',
+            cursor: 'pointer',
+            zIndex: 110,
+            letterSpacing: '1px',
+            transition: 'all 0.2s',
+            fontFamily: 'var(--font-display)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#fff';
+            e.currentTarget.style.color = '#000';
+            e.currentTarget.style.transform = 'scale(1.05)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'rgba(20, 20, 20, 0.85)';
+            e.currentTarget.style.color = '#fff';
+            e.currentTarget.style.transform = 'scale(1)';
+          }}
+        >
+          Skip Intro
+        </button>
+      )}
+
+      {/* Floating Controller overlay bar */}
+      {showControls && (
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0) 100%)',
+          padding: '40px 4% 30px 4%',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px',
+          zIndex: 100,
+          transition: 'opacity 0.3s ease'
+        }}>
+          {/* Progress Seek timeline */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+            <span style={{ color: '#aaa', fontSize: '0.9rem' }}>{formatTime(currentTime)}</span>
+            <input
+              type="range"
+              min={0}
+              max={duration || 100}
+              value={currentTime}
+              onChange={handleSeek}
+              style={{
+                flexGrow: 1,
+                accentColor: 'var(--netflix-red)',
+                cursor: 'pointer',
+                height: '4px'
+              }}
+            />
+            <span style={{ color: '#aaa', fontSize: '0.9rem' }}>{formatTime(duration)}</span>
+          </div>
+
+          {/* Control Triggers */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '25px' }}>
+              {/* Play Pause */}
+              <button 
+                onClick={handlePlayPause}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+              >
+                {isPlaying ? <Pause size={24} /> : <Play size={24} fill="#fff" />}
+              </button>
+
+              {/* Rewind */}
+              <button 
+                onClick={rewind}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+              >
+                <RotateCcw size={22} />
+              </button>
+
+              {/* Skip Forward */}
+              <button 
+                onClick={skipForward}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+              >
+                <SkipForward size={22} />
+              </button>
+
+              {/* Mute/Volume slider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button 
+                  onClick={toggleMute}
+                  style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+                >
+                  {isMuted ? <VolumeX size={22} /> : <Volume2 size={22} />}
+                </button>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={isMuted ? 0 : volume}
+                  onChange={handleVolumeChange}
+                  style={{
+                    width: '80px',
+                    accentColor: '#fff',
+                    height: '3px',
+                    cursor: 'pointer'
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Title / Fullscreen */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '30px' }}>
+              <span style={{ fontSize: '1.1rem', fontWeight: '500', color: '#eee' }}>
+                {movie?.title || 'Unknown Video'}
+              </span>
+
+              <button 
+                onClick={handleFullscreen}
+                style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}
+              >
+                <Maximize2 size={22} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Player;
