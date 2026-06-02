@@ -7,11 +7,13 @@ import { resolveMediaUrl, resolveVideoUrl } from '../api/media';
 const HeroBanner = ({ movie, watchlistIds, onWatchlistChange }) => {
   const navigate = useNavigate();
   const [playPreview, setPlayPreview] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     if (!movie) return undefined;
     setPlayPreview(false);
+    setVideoReady(false);
     const timer = setTimeout(() => setPlayPreview(true), 2500);
     return () => clearTimeout(timer);
   }, [movie]);
@@ -40,19 +42,23 @@ const HeroBanner = ({ movie, watchlistIds, onWatchlistChange }) => {
 
   return (
     <div className="hero-banner">
-      {playPreview && movie.videoUrl ? (
+      <div
+        className="hero-media hero-image"
+        style={{ backgroundImage: `url(${resolveMediaUrl(bannerImage)})` }}
+      />
+      {playPreview && movie.videoUrl && (
         <video
-          className="hero-media"
+          className={`hero-media hero-video ${videoReady ? 'is-ready' : ''}`}
           src={resolveVideoUrl(movie)}
           autoPlay
           muted
           loop
           playsInline
-        />
-      ) : (
-        <div
-          className="hero-media hero-image"
-          style={{ backgroundImage: `url(${resolveMediaUrl(bannerImage)})` }}
+          onCanPlay={() => setVideoReady(true)}
+          onError={() => {
+            setPlayPreview(false);
+            setVideoReady(false);
+          }}
         />
       )}
       <div className="hero-gradient" />
@@ -62,10 +68,10 @@ const HeroBanner = ({ movie, watchlistIds, onWatchlistChange }) => {
         <p className="hero-description">{movie.description}</p>
         <div className="hero-meta">
           <span className="hero-year">{movie.releaseYear}</span>
-          <span>•</span>
+          <span>/</span>
           <span>{movie.genre}</span>
-          <span>•</span>
-          <span className="hero-rating">★ {movie.rating}</span>
+          <span>/</span>
+          <span className="hero-rating">Rating {movie.rating}</span>
         </div>
         <div className="hero-actions">
           <button type="button" className="btn-primary hero-btn-play" onClick={() => navigate(`/watch/${movie.id}`)}>
@@ -76,7 +82,7 @@ const HeroBanner = ({ movie, watchlistIds, onWatchlistChange }) => {
             {inWatchlist ? 'In My List' : 'My List'}
           </button>
           <button type="button" className="btn-secondary hero-btn-info" onClick={() => navigate(`/movie/${movie.id}`)} aria-label="More info">
-            <Info size={20} />
+            <Info size={22} color="#fff" strokeWidth={2.5} />
           </button>
         </div>
       </div>

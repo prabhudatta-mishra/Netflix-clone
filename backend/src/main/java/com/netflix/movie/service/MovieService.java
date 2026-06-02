@@ -7,6 +7,7 @@ import com.netflix.movie.repository.MovieRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -55,6 +56,7 @@ public class MovieService {
     public MovieResponse createMovie(MovieRequest request) {
         Movie movie = new Movie();
         mapRequest(request, movie);
+        movie.setCreatedAt(LocalDateTime.now());
         return toResponse(movieRepository.save(movie));
     }
 
@@ -80,6 +82,7 @@ public class MovieService {
         movie.setThumbnailUrl(request.getThumbnailUrl());
         movie.setBannerUrl(request.getBannerUrl());
         movie.setVideoUrl(request.getVideoUrl());
+        movie.setFallbackVideoUrls(request.getFallbackVideoUrls());
         movie.setRating(request.getRating());
     }
 
@@ -93,6 +96,7 @@ public class MovieService {
                 movie.getThumbnailUrl(),
                 movie.getBannerUrl(),
                 movie.getVideoUrl(),
+                movie.getFallbackVideoUrls(),
                 movie.getRating(),
                 movie.getCreatedAt()
         );

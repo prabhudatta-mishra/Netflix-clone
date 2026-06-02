@@ -46,12 +46,7 @@ public class OfflineMovieImportService {
         List<Path> videoFiles = findVideos(inbox, importedDir);
         for (Path videoPath : videoFiles) {
             try {
-                String title = readTitle(videoPath);
-                if (movieRepository.existsByTitle(title)) {
-                    skipped.add(title + " (already in catalog)");
-                    continue;
-                }
-                importVideoFile(videoPath, videosDir, thumbsDir, importedDir);
+                String title = importVideoFile(videoPath, videosDir, thumbsDir, importedDir);
                 imported.add(title);
             } catch (Exception e) {
                 errors.add(videoPath.getFileName() + ": " + e.getMessage());
@@ -86,13 +81,13 @@ public class OfflineMovieImportService {
         return VideoFileValidator.isAllowedVideoFilename(path.getFileName().toString());
     }
 
-    private void importVideoFile(Path videoPath, Path videosDir, Path thumbsDir, Path importedDir)
+    private String importVideoFile(Path videoPath, Path videosDir, Path thumbsDir, Path importedDir)
             throws IOException {
         String baseName = baseName(videoPath.getFileName().toString());
         Path parent = videoPath.getParent();
 
         Properties meta = loadMeta(parent, baseName);
-        String title = meta.getProperty("title", humanize(baseName));
+        String title = meta.getProperty("title", humanize(cleanReleaseName(baseName)));
         String genre = meta.getProperty("genre", "General");
         String description = meta.getProperty("description", "Imported from offline folder.");
         double rating = parseRating(meta.getProperty("rating", "7.0"));
@@ -116,7 +111,11 @@ public class OfflineMovieImportService {
             moveToImported(thumbSource, importedDir);
         }
 
-        Movie movie = new Movie();
+        Movie movie = movieRepository.findAll().stream()
+                .filter(existing -> sameTitle(existing.getTitle(), title))
+                .findFirst()
+                .orElseGet(Movie::new);
+
         movie.setTitle(title);
         movie.setDescription(description);
         movie.setGenre(genre);
@@ -125,7 +124,9 @@ public class OfflineMovieImportService {
         movie.setBannerUrl(thumbnailUrl);
         movie.setVideoUrl("/uploads/videos/" + videoStored);
         movie.setRating(rating);
-        movie.setCreatedAt(LocalDateTime.now());
+        if (movie.getCreatedAt() == null) {
+            movie.setCreatedAt(LocalDateTime.now());
+        }
         movieRepository.save(movie);
 
         moveToImported(videoPath, importedDir);
@@ -133,6 +134,7 @@ public class OfflineMovieImportService {
         if (Files.isRegularFile(metaFile)) {
             moveToImported(metaFile, importedDir);
         }
+        return title;
     }
 
     private void moveToImported(Path source, Path importedDir) throws IOException {
@@ -177,6 +179,28 @@ public class OfflineMovieImportService {
 
     private String humanize(String baseName) {
         return baseName.replace('_', ' ').replace('-', ' ').trim();
+    }
+
+    private String cleanReleaseName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceAll("(?i)[\\._-]+", " ")
+                .replaceAll("(?i)\\b(19|20)\\d{2}\\b.*$", "")
+                .replaceAll("(?i)\\b(480p|720p|1080p|2160p|4k|hdr|bluray|brrip|webrip|web-dl|x264|x265|hevc|aac|dual audio)\\b.*$", "")
+                .trim();
+    }
+
+    private boolean sameTitle(String left, String right) {
+        return normalize(left).equals(normalize(right));
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "");
     }
 
     private double parseRating(String value) {

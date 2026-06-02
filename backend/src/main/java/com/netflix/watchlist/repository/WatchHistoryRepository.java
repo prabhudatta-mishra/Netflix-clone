@@ -3,6 +3,7 @@ package com.netflix.watchlist.repository;
 import com.netflix.watchlist.entity.WatchHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -20,4 +21,10 @@ public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long
 
     @Query("SELECT h.movieId FROM WatchHistory h WHERE h.userId IN :userIds AND h.movieId NOT IN :excludeIds GROUP BY h.movieId ORDER BY COUNT(h) DESC")
     List<Long> findMoviesWatchedByUsers(List<Long> userIds, List<Long> excludeIds);
+
+    @Transactional
+    void deleteByUserId(Long userId);
+
+    @Transactional
+    void deleteByIdAndUserId(Long id, Long userId);
 }

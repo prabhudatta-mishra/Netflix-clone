@@ -7,6 +7,7 @@ import MovieCard from '../components/MovieCard';
 import MovieModal from '../components/MovieModal';
 import { SkeletonHero, SkeletonRow } from '../components/SkeletonLoader';
 import api from '../api/axios';
+import { trackRecommendationEvent } from '../api/media';
 import { useToast } from '../context/ToastContext';
 
 const Home = () => {
@@ -69,22 +70,29 @@ const Home = () => {
       return;
     }
     try {
-      const res = await api.get(`/movies/search?title=${encodeURIComponent(query)}`);
+      trackRecommendationEvent(api, { eventType: 'SEARCH', queryText: query, context: 'navbar' });
+      const res = await api.get(`/recommendations/search?q=${encodeURIComponent(query)}&limit=30`);
       setFilteredMovies(res.data);
     } catch {
-      const lower = query.toLowerCase();
-      setFilteredMovies(
-        movies.filter(
-          (m) =>
-            m.title?.toLowerCase().includes(lower) ||
-            m.genre?.toLowerCase().includes(lower) ||
-            m.description?.toLowerCase().includes(lower)
-        )
-      );
+      try {
+        const res = await api.get(`/movies/search?title=${encodeURIComponent(query)}`);
+        setFilteredMovies(res.data);
+      } catch {
+        const lower = query.toLowerCase();
+        setFilteredMovies(
+          movies.filter(
+            (m) =>
+              m.title?.toLowerCase().includes(lower) ||
+              m.genre?.toLowerCase().includes(lower) ||
+              m.description?.toLowerCase().includes(lower)
+          )
+        );
+      }
     }
   };
 
   const handleWatchlistChange = (movieId, isAdded) => {
+    trackRecommendationEvent(api, { movieId, eventType: isAdded ? 'ADD_TO_LIST' : 'REMOVE_FROM_LIST', context: 'home' });
     setWatchlistIds((prev) => {
       const updated = new Set(prev);
       if (isAdded) updated.add(movieId);
@@ -138,6 +146,9 @@ const Home = () => {
         {isSearchMode ? (
           <section>
             <h2 className="section-title">Search Results</h2>
+            <p className="carousel-subtitle" style={{ padding: '0 4%', marginTop: -8 }}>
+              Ranked by title, genre, description, rating, and your watch behavior.
+            </p>
             {filteredMovies.length === 0 ? (
               <p className="empty-text">No movies found for &quot;{searchQuery}&quot;</p>
             ) : (

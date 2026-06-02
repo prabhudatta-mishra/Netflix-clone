@@ -1,17 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Plus, Check, Star } from 'lucide-react';
+import { Check, Play, Plus, Star } from 'lucide-react';
 import api from '../api/axios';
-import { resolveMediaUrl } from '../api/media';
+import { resolveMediaUrl, trackRecommendationEvent } from '../api/media';
+
+const fallbackThumb = 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=600';
 
 const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, showMatchScore }) => {
   const navigate = useNavigate();
   const [inWatchlist, setInWatchlist] = useState(isWatchlistItem);
   const [loading, setLoading] = useState(false);
+  const [thumbFailed, setThumbFailed] = useState(false);
 
-  // Sync state with parent watchlist changes (e.g. if modified in modal)
   useEffect(() => {
     setInWatchlist(isWatchlistItem);
+    setThumbFailed(false);
   }, [isWatchlistItem]);
 
   const toggleWatchlist = async (e) => {
@@ -21,11 +24,11 @@ const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, sho
       if (inWatchlist) {
         await api.delete(`/watchlist/${movie.id}`);
         setInWatchlist(false);
-        if (onWatchlistChange) onWatchlistChange(movie.id, false);
+        onWatchlistChange?.(movie.id, false);
       } else {
         await api.post(`/watchlist/${movie.id}`);
         setInWatchlist(true);
-        if (onWatchlistChange) onWatchlistChange(movie.id, true);
+        onWatchlistChange?.(movie.id, true);
       }
     } catch (err) {
       console.error('Watchlist modification failed', err);
@@ -35,113 +38,73 @@ const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, sho
   };
 
   const handlePlayClick = (e) => {
-    e.stopPropagation(); // Avoid triggering card modal on play icon click
+    e.stopPropagation();
+    trackRecommendationEvent(api, { movieId: movie.id, eventType: 'PLAY', context: 'movie-card' });
     navigate(`/watch/${movie.id}`);
   };
 
   return (
-    <div 
+    <div
       className="movie-card animate-fade-in"
-      onClick={() => onCardClick && onCardClick(movie.id)}
+      onClick={() => {
+        trackRecommendationEvent(api, { movieId: movie.id, eventType: 'CLICK', context: 'movie-card' });
+        onCardClick?.(movie.id);
+      }}
     >
-      {/* Movie Thumbnail */}
-      <div 
-        className="movie-card-thumb"
-        style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(0,0,0,0) 70%, rgba(20,20,20,0.95) 100%), url(${resolveMediaUrl(movie.thumbnailUrl) || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=600'})`,
-        }}
-      >
-        <div className="movie-card-overlay">
-          <div className="movie-play-btn" onClick={handlePlayClick}>
-            <Play size={24} color="#fff" fill="#fff" />
+      <div className="movie-card-thumb">
+        {!thumbFailed && (
+          <img
+            className="movie-card-img"
+            src={resolveMediaUrl(movie.thumbnailUrl) || fallbackThumb}
+            alt=""
+            onError={() => setThumbFailed(true)}
+          />
+        )}
+        {thumbFailed && (
+          <div className="movie-card-fallback" aria-hidden="true">
+            <span>{getInitials(movie.title)}</span>
           </div>
+        )}
+        <div className="movie-card-overlay">
+          <button type="button" className="movie-play-btn" onClick={handlePlayClick} aria-label={`Play ${movie.title}`}>
+            <Play size={24} />
+          </button>
         </div>
+
         <div className="movie-hover-preview">
           {showMatchScore && movie.matchScore != null && (
             <span className="match-badge">{Math.round(movie.matchScore)}% Match</span>
           )}
           <h4>{movie.title}</h4>
-          <p>{movie.description?.slice(0, 90)}...</p>
+          <p>{movie.description ? `${movie.description.slice(0, 90)}...` : 'Ready to stream.'}</p>
           {movie.aiReason && <span className="preview-reason">{movie.aiReason}</span>}
           <span className="preview-genre">{movie.genre}</span>
-          <span className="preview-rating">★ {movie.rating}</span>
+          <span className="preview-rating">Rating {formatRating(movie.rating)}</span>
         </div>
       </div>
 
-      {/* Movie Details Info */}
-      <div style={{
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '8px',
-        flexGrow: 1,
-        justifyContent: 'space-between'
-      }}>
+      <div className="movie-card-body">
         <div>
-          <h3 style={{
-            fontSize: '1rem',
-            fontWeight: '700',
-            color: '#fff',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis'
-          }}>{movie.title}</h3>
-          
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            marginTop: '4px',
-            fontSize: '0.8rem',
-            color: 'var(--text-gray)'
-          }}>
-            <span style={{ color: '#46d369', fontWeight: '600' }}>{movie.releaseYear}</span>
-            <span>•</span>
-            <span style={{
-              background: 'rgba(255,255,255,0.1)',
-              padding: '2px 6px',
-              borderRadius: '4px',
-              fontSize: '0.75rem'
-            }}>{movie.genre}</span>
+          <h3 className="movie-card-title">{movie.title}</h3>
+          <div className="movie-card-meta">
+            {movie.releaseYear && <span className="movie-card-year">{movie.releaseYear}</span>}
+            {movie.releaseYear && movie.genre && <span>/</span>}
+            {movie.genre && <span className="movie-card-genre">{movie.genre}</span>}
           </div>
         </div>
 
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: '8px'
-        }}>
-          {/* Play CTA & Star Rating */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#ffc107', fontSize: '0.85rem' }}>
+        <div className="movie-card-footer">
+          <div className="movie-card-rating">
             <Star size={14} fill="#ffc107" />
-            <span style={{ fontWeight: '600', color: '#e5e5e5' }}>{movie.rating?.toFixed(1) || '7.5'}</span>
+            <span>{formatRating(movie.rating)}</span>
           </div>
 
-          {/* Add / Remove from Watchlist Toggle CTA */}
-          <button 
+          <button
+            type="button"
             disabled={loading}
             onClick={toggleWatchlist}
-            style={{
-              background: inWatchlist ? 'rgba(70, 211, 105, 0.2)' : 'rgba(255,255,255,0.1)',
-              border: inWatchlist ? '1px solid #46d369' : '1px solid rgba(255,255,255,0.3)',
-              borderRadius: '50%',
-              width: '36px',
-              height: '36px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              color: inWatchlist ? '#46d369' : '#fff',
-              transition: 'all 0.2s ease',
-              outline: 'none'
-            }}
-            onMouseEnter={(e) => {
-              if(!inWatchlist) e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
-            }}
-            onMouseLeave={(e) => {
-              if(!inWatchlist) e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-            }}
+            className={`movie-list-toggle ${inWatchlist ? 'is-saved' : ''}`}
+            aria-label={inWatchlist ? 'Remove from My List' : 'Add to My List'}
           >
             {inWatchlist ? <Check size={16} /> : <Plus size={16} />}
           </button>
@@ -149,6 +112,17 @@ const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, sho
       </div>
     </div>
   );
+};
+
+const formatRating = (rating) => {
+  const value = Number(rating);
+  return Number.isFinite(value) ? value.toFixed(1) : '7.5';
+};
+
+const getInitials = (title = '') => {
+  const words = String(title).trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'N';
+  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase();
 };
 
 export default MovieCard;

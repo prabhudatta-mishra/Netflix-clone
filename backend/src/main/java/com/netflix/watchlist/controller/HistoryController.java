@@ -25,4 +25,28 @@ public class HistoryController {
     public ResponseEntity<WatchHistoryResponse> recordWatch(Authentication auth, @PathVariable Long movieId) {
         return ResponseEntity.ok(historyService.recordWatch(auth.getName(), movieId));
     }
+
+    @DeleteMapping("/{historyId}")
+    public ResponseEntity<Void> deleteHistoryItem(Authentication auth, @PathVariable Long historyId) {
+        historyService.deleteHistoryItem(auth.getName(), historyId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/delete/{historyId}")
+    public ResponseEntity<Void> deleteHistoryItemPost(Authentication auth, @PathVariable Long historyId) {
+        historyService.deleteHistoryItem(auth.getName(), historyId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> clearHistory(Authentication auth) {
+        historyService.clearHistory(auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/clear")
+    public ResponseEntity<Void> clearHistoryPost(Authentication auth) {
+        historyService.clearHistory(auth.getName());
+        return ResponseEntity.noContent().build();
+    }
 }

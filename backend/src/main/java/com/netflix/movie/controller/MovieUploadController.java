@@ -49,7 +49,9 @@ public class MovieUploadController {
         if (thumbnail == null || thumbnail.isEmpty()) {
             throw new IllegalArgumentException("Thumbnail image is required.");
         }
-        VideoFileValidator.validate(video);
+        if (video != null && !video.isEmpty()) {
+            VideoFileValidator.validate(video);
+        }
 
         double movieRating = rating != null ? rating : 7.0;
         if (movieRating < 0 || movieRating > 10) {
@@ -57,7 +59,7 @@ public class MovieUploadController {
         }
 
         String thumbnailUrl;
-        String videoUrl;
+        String videoUrl = "";
 
         {
             String ext = VideoFileValidator.extension(thumbnail.getOriginalFilename());
@@ -71,7 +73,7 @@ public class MovieUploadController {
             thumbnailUrl = "/uploads/thumbnails/" + name;
         }
 
-        {
+        if (video != null && !video.isEmpty()) {
             String ext = VideoFileValidator.extension(video.getOriginalFilename());
             if (ext.isEmpty()) {
                 ext = "mp4";
@@ -101,7 +103,7 @@ public class MovieUploadController {
         return new MovieResponse(
                 movie.getId(), movie.getTitle(), movie.getDescription(), movie.getGenre(),
                 movie.getReleaseYear(), movie.getThumbnailUrl(), movie.getBannerUrl(),
-                movie.getVideoUrl(), movie.getRating(), movie.getCreatedAt()
+                movie.getVideoUrl(), movie.getFallbackVideoUrls(), movie.getRating(), movie.getCreatedAt()
         );
     }
 }

@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Play, Plus, Check, Star, Calendar, Film } from 'lucide-react';
 import api from '../api/axios';
+import { resolveMediaUrl } from '../api/media';
 
 const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
   const navigate = useNavigate();
@@ -129,7 +130,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
               style={{
                 height: '400px',
                 width: '100%',
-                backgroundImage: `linear-gradient(to top, #181818 0%, rgba(24,24,24,0.4) 60%, rgba(24,24,24,0) 100%), url(${movie.thumbnailUrl || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=1200'})`,
+                backgroundImage: `linear-gradient(to top, #181818 0%, rgba(24,24,24,0.4) 60%, rgba(24,24,24,0) 100%), url(${resolveMediaUrl(movie.thumbnailUrl) || 'https://images.unsplash.com/photo-1594909122845-11baa439b7bf?q=80&w=1200'})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 display: 'flex',
@@ -290,7 +291,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
                             gap: '4px',
                             color: '#ffc107'
                           }}>
-                            ★ {rec.rating}
+                            Rating {rec.rating}
                           </div>
                         </div>
 
@@ -337,3 +338,5 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
 };
 
 export default MovieModal;
+
+

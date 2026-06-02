@@ -5,6 +5,7 @@ import com.netflix.movie.repository.MovieRepository;
 import com.netflix.user.entity.User;
 import com.netflix.user.repository.UserRepository;
 import com.netflix.watchlist.dto.RecommendationResponse;
+import com.netflix.recommendation.service.AdvancedRecommendationService;
 import com.netflix.watchlist.repository.WatchHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,7 +25,15 @@ public class RecommendationService {
     @Autowired
     private WatchHistoryRepository watchHistoryRepository;
 
+    @Autowired
+    private AdvancedRecommendationService advancedRecommendationService;
+
     public List<RecommendationResponse> getRecommendations(String username) {
+        List<RecommendationResponse> advanced = advancedRecommendationService.personalized(username, 12);
+        if (!advanced.isEmpty()) {
+            return advanced;
+        }
+
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

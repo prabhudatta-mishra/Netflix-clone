@@ -42,6 +42,11 @@ public class NotificationService {
         notificationRepository.save(n);
     }
 
+    public void clearAll(String username) {
+        User user = getUser(username);
+        notificationRepository.deleteByUserId(user.getId());
+    }
+
     public void createNotification(String username, String title, String message, String type) {
         User user = userRepository.findByUsername(username).orElse(null);
         if (user == null) return;

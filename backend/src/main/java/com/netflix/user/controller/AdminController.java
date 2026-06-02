@@ -8,9 +8,13 @@ import com.netflix.user.dto.OfflineImportResponse;
 import com.netflix.user.service.AdminDashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.Authentication;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -41,6 +45,42 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<AdminUserSummaryResponse>> getUsers() {
         return ResponseEntity.ok(adminDashboardService.getAllUsersWithActivity());
+    }
+
+    @DeleteMapping("/users/by-username/{username}")
+    public ResponseEntity<Void> deleteUserByUsername(@PathVariable String username, Authentication auth) {
+        adminDashboardService.deleteUserByUsername(username, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/users")
+    public ResponseEntity<Void> deleteUserByUsernameQuery(@RequestParam String username, Authentication auth) {
+        adminDashboardService.deleteUserByUsername(username, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/users/delete")
+    public ResponseEntity<Void> deleteUserByUsernamePost(@RequestParam String username, Authentication auth) {
+        adminDashboardService.deleteUserByUsername(username, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/users/{id}")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id, Authentication auth) {
+        adminDashboardService.deleteUser(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/users/{id}/delete")
+    public ResponseEntity<Void> deleteUserByIdPost(@PathVariable Long id, Authentication auth) {
+        adminDashboardService.deleteUser(id, auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/delete-user")
+    public ResponseEntity<Void> deleteUserAction(@RequestParam String username, Authentication auth) {
+        adminDashboardService.deleteUserByUsername(username, auth.getName());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/offline-inbox")

@@ -19,10 +19,6 @@ public class MovieDataSeeder implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        if (movieRepository.count() > 0) {
-            return;
-        }
-
         List<Movie> movies = Arrays.asList(
             createMovie("Interstellar", "A team of explorers travel through a wormhole in space.", "Sci-Fi", 2014,
                 "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=400",
@@ -58,8 +54,38 @@ public class MovieDataSeeder implements ApplicationRunner {
                 "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4", 8.9)
         );
 
-        movieRepository.saveAll(movies);
-        System.out.println("Seeded 8 sample movies with banner URLs");
+        if (movieRepository.count() == 0) {
+            movieRepository.saveAll(movies);
+            System.out.println("Seeded 8 sample movies with playable demo video URLs.");
+            return;
+        }
+
+        repairSampleMovies(movies);
+    }
+
+    private void repairSampleMovies(List<Movie> samples) {
+        int repaired = 0;
+        List<Movie> existing = movieRepository.findAll();
+        for (Movie sample : samples) {
+            for (Movie movie : existing) {
+                if (movie.getTitle() != null && movie.getTitle().equalsIgnoreCase(sample.getTitle())) {
+                    movie.setDescription(sample.getDescription());
+                    movie.setGenre(sample.getGenre());
+                    movie.setReleaseYear(sample.getReleaseYear());
+                    movie.setThumbnailUrl(sample.getThumbnailUrl());
+                    movie.setBannerUrl(sample.getBannerUrl());
+                    movie.setVideoUrl(sample.getVideoUrl());
+                    movie.setFallbackVideoUrls(sample.getFallbackVideoUrls());
+                    movie.setRating(sample.getRating());
+                    movieRepository.save(movie);
+                    repaired++;
+                    break;
+                }
+            }
+        }
+        if (repaired > 0) {
+            System.out.println("Repaired " + repaired + " sample movies with playable demo video URLs.");
+        }
     }
 
     private Movie createMovie(String title, String description, String genre, int year,
@@ -72,6 +98,10 @@ public class MovieDataSeeder implements ApplicationRunner {
         movie.setThumbnailUrl(thumbnail);
         movie.setBannerUrl(banner);
         movie.setVideoUrl(video);
+        movie.setFallbackVideoUrls(String.join(",",
+                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4"));
         movie.setRating(rating);
         movie.setCreatedAt(LocalDateTime.now());
         return movie;

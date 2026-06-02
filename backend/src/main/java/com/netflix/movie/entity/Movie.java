@@ -32,6 +32,9 @@ public class Movie {
     @Column(name = "video_url", length = 500)
     private String videoUrl;
 
+    @Column(name = "fallback_video_urls", columnDefinition = "TEXT")
+    private String fallbackVideoUrls;
+
     private Double rating;
 
     @Column(name = "created_at")
@@ -62,6 +65,9 @@ public class Movie {
 
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+
+    public String getFallbackVideoUrls() { return fallbackVideoUrls; }
+    public void setFallbackVideoUrls(String fallbackVideoUrls) { this.fallbackVideoUrls = fallbackVideoUrls; }
 
     public Double getRating() { return rating; }
     public void setRating(Double rating) { this.rating = rating; }

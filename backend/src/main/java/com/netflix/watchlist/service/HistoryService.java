@@ -49,6 +49,16 @@ public class HistoryService {
         return toResponse(saved);
     }
 
+    public void deleteHistoryItem(String username, Long historyId) {
+        User user = getUser(username);
+        watchHistoryRepository.deleteByIdAndUserId(historyId, user.getId());
+    }
+
+    public void clearHistory(String username) {
+        User user = getUser(username);
+        watchHistoryRepository.deleteByUserId(user.getId());
+    }
+
     private User getUser(String username) {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("User not found"));

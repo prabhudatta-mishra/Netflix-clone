@@ -13,8 +13,9 @@ public class MovieRequest {
     private String thumbnailUrl;
     private String bannerUrl;
 
-    @NotBlank(message = "Video URL is required")
     private String videoUrl;
+
+    private String fallbackVideoUrls;
 
     private Double rating;
 
@@ -37,6 +38,9 @@ public class MovieRequest {
 
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+
+    public String getFallbackVideoUrls() { return fallbackVideoUrls; }
+    public void setFallbackVideoUrls(String fallbackVideoUrls) { this.fallbackVideoUrls = fallbackVideoUrls; }
 
     public Integer getReleaseYear() { return releaseYear; }
     public void setReleaseYear(Integer releaseYear) { this.releaseYear = releaseYear; }

@@ -12,6 +12,7 @@ public class MovieResponse {
     private String thumbnailUrl;
     private String bannerUrl;
     private String videoUrl;
+    private String fallbackVideoUrls;
     private Double rating;
     private LocalDateTime createdAt;
 
@@ -19,7 +20,7 @@ public class MovieResponse {
 
     public MovieResponse(Long id, String title, String description, String genre,
                          Integer releaseYear, String thumbnailUrl, String bannerUrl,
-                         String videoUrl, Double rating, LocalDateTime createdAt) {
+                         String videoUrl, String fallbackVideoUrls, Double rating, LocalDateTime createdAt) {
         this.id = id;
         this.title = title;
         this.description = description;
@@ -28,6 +29,7 @@ public class MovieResponse {
         this.thumbnailUrl = thumbnailUrl;
         this.bannerUrl = bannerUrl;
         this.videoUrl = videoUrl;
+        this.fallbackVideoUrls = fallbackVideoUrls;
         this.rating = rating;
         this.createdAt = createdAt;
     }
@@ -55,6 +57,9 @@ public class MovieResponse {
 
     public String getVideoUrl() { return videoUrl; }
     public void setVideoUrl(String videoUrl) { this.videoUrl = videoUrl; }
+
+    public String getFallbackVideoUrls() { return fallbackVideoUrls; }
+    public void setFallbackVideoUrls(String fallbackVideoUrls) { this.fallbackVideoUrls = fallbackVideoUrls; }
 
     public Double getRating() { return rating; }
     public void setRating(Double rating) { this.rating = rating; }

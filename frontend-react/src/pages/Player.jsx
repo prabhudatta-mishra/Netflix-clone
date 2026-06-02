@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Pause, RotateCcw, Volume2, VolumeX, Maximize2, SkipForward } from 'lucide-react';
 import api from '../api/axios';
-import { fetchPlaybackInfo, resolveVideoUrl } from '../api/media';
+import { fetchPlaybackInfo, resolveVideoUrl, trackRecommendationEvent } from '../api/media';
 
 const Player = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -21,16 +22,20 @@ const Player = () => {
   const [videoError, setVideoError] = useState('');
   const [playbackHint, setPlaybackHint] = useState('');
   const [streamUrl, setStreamUrl] = useState('');
+  const [fallbackUrls, setFallbackUrls] = useState([]);
+  const [demoMode, setDemoMode] = useState(false);
   
   let controlsTimeout = null;
   const historyRecorded = useRef(false);
   const lastSaveRef = useRef(0);
+  const fallbackIndexRef = useRef(0);
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
         setVideoError('');
+        setDemoMode(false);
         const [movieRes, playRes] = await Promise.all([
           api.get(`/movies/${id}`),
           fetchPlaybackInfo(api, id),
@@ -38,10 +43,29 @@ const Player = () => {
         setMovie(movieRes.data);
         const play = playRes;
         const base = typeof window !== 'undefined' ? window.location.origin : '';
-        setStreamUrl(play.streamUrl ? `${base}${play.streamUrl}` : resolveVideoUrl(movieRes.data));
-        setPlaybackHint(play.message || '');
+        const backendStream = resolveVideoUrl(movieRes.data);
+        const directUrl = movieRes.data?.videoUrl?.startsWith('http') ? movieRes.data.videoUrl : '';
+        const backupUrls = [
+          ...parseFallbackUrls(movieRes.data?.fallbackVideoUrls),
+          ...defaultSampleFallbackUrls,
+        ];
+        const nextStreamUrl = play.sourceType === 'remote'
+          ? backendStream
+          : play.streamUrl?.startsWith('http')
+            ? play.streamUrl
+            : play.streamUrl
+              ? `${base}${play.streamUrl}`
+              : backendStream;
+        setStreamUrl(nextStreamUrl);
+        setFallbackUrls(play.sourceType === 'local'
+          ? []
+          : [directUrl, ...backupUrls].filter((url, index, list) => url && url !== nextStreamUrl && list.indexOf(url) === index));
+        setPlaybackHint(play.ready ? '' : (play.message || ''));
+        fallbackIndexRef.current = 0;
         if (!play.ready) {
-          setVideoError(play.message || 'Video not ready. Ask admin to Sync Movies.');
+          setDemoMode(true);
+          setDuration(120);
+          setIsPlaying(true);
         }
       } catch (err) {
         console.error(err);
@@ -76,12 +100,13 @@ const Player = () => {
     if (historyRecorded.current) return;
     historyRecorded.current = true;
     api.post(`/history/${id}`).catch(() => {});
+    trackRecommendationEvent(api, { movieId: Number(id), eventType: 'PLAY', context: 'player' });
   };
 
   // Bind Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (!videoRef.current || loading) return;
+      if ((!videoRef.current && !demoMode) || loading) return;
 
       switch (e.key) {
         case ' ': // Spacebar
@@ -100,7 +125,7 @@ const Player = () => {
           e.preventDefault();
           setVolume(prev => {
             const next = Math.min(prev + 0.1, 1);
-            videoRef.current.volume = next;
+            if (videoRef.current) videoRef.current.volume = next;
             return next;
           });
           break;
@@ -108,7 +133,7 @@ const Player = () => {
           e.preventDefault();
           setVolume(prev => {
             const next = Math.max(prev - 0.1, 0);
-            videoRef.current.volume = next;
+            if (videoRef.current) videoRef.current.volume = next;
             return next;
           });
           break;
@@ -128,6 +153,12 @@ const Player = () => {
 
   // Handle playing state
   const handlePlayPause = () => {
+    if (demoMode) {
+      setIsPlaying((value) => !value);
+      recordHistoryOnce();
+      handleMouseMove();
+      return;
+    }
     if (!videoRef.current) return;
     if (isPlaying) {
       videoRef.current.pause();
@@ -142,14 +173,18 @@ const Player = () => {
 
   // Skip 10s forward
   const skipForward = () => {
-    if (videoRef.current) {
+    if (demoMode) {
+      setCurrentTime((time) => Math.min(time + 10, duration || 120));
+    } else if (videoRef.current) {
       videoRef.current.currentTime += 10;
     }
   };
 
   // Rewind 10s backward
   const rewind = () => {
-    if (videoRef.current) {
+    if (demoMode) {
+      setCurrentTime((time) => Math.max(time - 10, 0));
+    } else if (videoRef.current) {
       videoRef.current.currentTime -= 10;
     }
   };
@@ -162,6 +197,12 @@ const Player = () => {
       if (time - lastSaveRef.current >= 10) {
         lastSaveRef.current = time;
         saveProgress();
+        trackRecommendationEvent(api, {
+          movieId: Number(id),
+          eventType: 'PLAY',
+          watchSeconds: Math.floor(time),
+          context: 'progress',
+        });
       }
       if (time >= 5 && time <= 25) {
         setShowSkipIntro(true);
@@ -179,7 +220,9 @@ const Player = () => {
 
   const handleSeek = (e) => {
     const seekTime = parseFloat(e.target.value);
-    if (videoRef.current) {
+    if (demoMode) {
+      setCurrentTime(seekTime);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = seekTime;
       setCurrentTime(seekTime);
     }
@@ -187,7 +230,9 @@ const Player = () => {
 
   // Mute toggle
   const toggleMute = () => {
-    if (videoRef.current) {
+    if (demoMode) {
+      setIsMuted((value) => !value);
+    } else if (videoRef.current) {
       const nextMuted = !isMuted;
       videoRef.current.muted = nextMuted;
       setIsMuted(nextMuted);
@@ -207,7 +252,9 @@ const Player = () => {
 
   // Fullscreen trigger
   const handleFullscreen = () => {
-    if (videoRef.current) {
+    if (demoMode && canvasRef.current) {
+      canvasRef.current.requestFullscreen?.();
+    } else if (videoRef.current) {
       if (videoRef.current.requestFullscreen) {
         videoRef.current.requestFullscreen();
       } else if (videoRef.current.webkitRequestFullscreen) { /* Safari */
@@ -219,7 +266,10 @@ const Player = () => {
   };
 
   const handleSkipIntroAction = () => {
-    if (videoRef.current) {
+    if (demoMode) {
+      setCurrentTime(30);
+      setShowSkipIntro(false);
+    } else if (videoRef.current) {
       videoRef.current.currentTime = 30; // Skip straight past intro to 30s
       setShowSkipIntro(false);
     }
@@ -253,11 +303,64 @@ const Player = () => {
   const activeVideoUrl = streamUrl || (movie ? resolveVideoUrl(movie) : '');
 
   const handleVideoError = () => {
+    const nextFallback = fallbackUrls[fallbackIndexRef.current];
+    if (nextFallback) {
+      fallbackIndexRef.current += 1;
+      setVideoError('');
+      setStreamUrl(nextFallback);
+      return;
+    }
+
     setVideoError(
       playbackHint ||
-        'Cannot play video. Ask admin: copy H.264 MP4 to offline-import → Sync Movies.'
+        'This local video file reached the browser, but it could not play. Convert it to H.264 video + AAC audio MP4.'
     );
+    setIsPlaying(false);
   };
+
+  useEffect(() => {
+    if (!demoMode) return undefined;
+    const timer = setInterval(() => {
+      setCurrentTime((time) => {
+        if (!isPlaying) return time;
+        const next = Math.min(time + 1, 120);
+        if (next >= 120) setIsPlaying(false);
+        setShowSkipIntro(next >= 5 && next <= 25);
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [demoMode, isPlaying]);
+
+  useEffect(() => {
+    if (!demoMode || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    const gradient = ctx.createLinearGradient(0, 0, w, h);
+    gradient.addColorStop(0, '#080808');
+    gradient.addColorStop(0.55, '#171717');
+    gradient.addColorStop(1, '#3a070b');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(229, 9, 20, 0.18)';
+    ctx.fillRect(0, h * 0.7, w, h * 0.3);
+    for (let i = 0; i < 34; i += 1) {
+      const x = ((i * 79 + currentTime * 42) % (w + 120)) - 60;
+      const y = 90 + ((i * 43) % (h - 190));
+      ctx.fillStyle = `rgba(255,255,255,${0.035 + (i % 5) * 0.014})`;
+      ctx.fillRect(x, y, 90 + (i % 4) * 26, 2);
+    }
+    ctx.fillStyle = '#fff';
+    ctx.font = '900 58px Arial, sans-serif';
+    ctx.fillText(movie?.title || 'Netflix Demo', 70, 120);
+    ctx.font = '24px Arial, sans-serif';
+    ctx.fillStyle = '#d7d7d7';
+    ctx.fillText('Demo playback - upload a local MP4 for real movie video', 72, 162);
+    ctx.fillStyle = '#e50914';
+    ctx.fillRect(72, h - 116, Math.max(10, (currentTime / 120) * (w - 144)), 6);
+  }, [demoMode, currentTime, movie?.title]);
 
   if (loading) {
     return (
@@ -298,28 +401,42 @@ const Player = () => {
         </div>
       )}
 
-      <video
-        key={activeVideoUrl}
-        ref={videoRef}
-        src={activeVideoUrl}
-        autoPlay
-        controls={false}
-        playsInline
-        preload="auto"
-        onClick={handlePlayPause}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={() => {
-          setVideoError('');
-          handleLoadedMetadata();
-        }}
-        onError={handleVideoError}
-        style={{
-          width: '100%',
-          height: '100%',
-          objectFit: 'contain',
-          visibility: videoError ? 'hidden' : 'visible',
-        }}
-      />
+      {demoMode ? (
+        <canvas
+          ref={canvasRef}
+          width={1280}
+          height={720}
+          onClick={handlePlayPause}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      ) : (
+        <video
+          key={activeVideoUrl}
+          ref={videoRef}
+          src={activeVideoUrl}
+          autoPlay
+          controls={false}
+          playsInline
+          preload="auto"
+          onClick={handlePlayPause}
+          onTimeUpdate={handleTimeUpdate}
+          onLoadedMetadata={() => {
+            setVideoError('');
+            handleLoadedMetadata();
+          }}
+          onError={handleVideoError}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            visibility: videoError ? 'hidden' : 'visible',
+          }}
+        />
+      )}
 
       {/* Back Button Overlay */}
       {showControls && (
@@ -487,4 +604,21 @@ const Player = () => {
   );
 };
 
+const parseFallbackUrls = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return String(value)
+    .split(/\r?\n|,/)
+    .map((url) => url.trim())
+    .filter(Boolean);
+};
+
+const defaultSampleFallbackUrls = [
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+];
+
 export default Player;
+

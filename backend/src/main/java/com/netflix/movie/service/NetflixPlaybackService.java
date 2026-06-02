@@ -12,12 +12,17 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 @Service
 public class NetflixPlaybackService {
 
     @Value("${app.upload.dir:uploads}")
     private String uploadDir;
+
+    @Value("${app.offline.import-dir:offline-import}")
+    private String importDir;
 
     @Autowired
     private MovieRepository movieRepository;
@@ -28,19 +33,31 @@ public class NetflixPlaybackService {
 
         String streamUrl = "/api/movies/" + movieId + "/stream";
         String videoUrl = movie.getVideoUrl();
+        Optional<Path> localMatch = findMatchingLocalVideo(movie.getTitle());
+        boolean seededDemoUrl = videoUrl != null && videoUrl.contains("commondatastorage.googleapis.com/gtv-videos-bucket/sample");
+
+        if (localMatch.isPresent() && (videoUrl == null || videoUrl.isBlank() || seededDemoUrl)) {
+            Path file = localMatch.get();
+            return plan(movie, streamUrl, true,
+                    "Ready to play local file: " + file.getFileName(),
+                    "local", "byte-range", extension(file.getFileName().toString()),
+                    codecHint(file.getFileName().toString()), fileSize(file), true,
+                    "Local file takes priority over demo URLs.");
+        }
 
         if (videoUrl == null || videoUrl.isBlank()) {
-            return plan(movie, streamUrl, false,
-                    "No video file for this movie. Admin: add file to offline-import and click Sync Movies.",
-                    "missing", "none", "", "unknown", 0, false,
-                    "Import a browser-playable H.264 MP4, then click Sync Movies.");
+            String demoUrl = demoVideoUrl(movie.getTitle());
+            return plan(movie, demoUrl, true,
+                    "Streaming from online demo source.",
+                    "remote", "redirect", extension(demoUrl), codecHint(demoUrl), 0, true,
+                    "For production, upload or import the movie file locally.");
         }
 
         if (videoUrl.startsWith("http://") || videoUrl.startsWith("https://")) {
-            return plan(movie, streamUrl, true,
-                    "Streaming from online source through playback redirect.",
+            return plan(movie, videoUrl, true,
+                    "Streaming from online demo source.",
                     "remote", "redirect", extension(videoUrl), codecHint(videoUrl), 0, true,
-                    "Cache or mirror remote files locally, then add adaptive HLS renditions.");
+                    "For production, upload or import the movie file locally.");
         }
 
         Path file = resolveLocalFile(videoUrl);
@@ -128,5 +145,85 @@ public class NetflixPlaybackService {
         } catch (IOException e) {
             return 0;
         }
+    }
+
+    private Optional<Path> findMatchingLocalVideo(String title) {
+        String normalizedTitle = normalize(title);
+        if (normalizedTitle.length() < 3) {
+            return Optional.empty();
+        }
+        Path uploads = Paths.get(uploadDir).toAbsolutePath().normalize().resolve("videos");
+        Path offline = Paths.get(importDir).toAbsolutePath().normalize();
+        Path imported = offline.resolve("imported");
+        for (Path dir : new Path[] { uploads, offline, imported }) {
+            Optional<Path> match = findMatchingLocalVideoIn(dir, normalizedTitle);
+            if (match.isPresent()) {
+                return match;
+            }
+        }
+        return Optional.empty();
+    }
+
+    private Optional<Path> findMatchingLocalVideoIn(Path dir, String normalizedTitle) {
+        if (!Files.isDirectory(dir)) {
+            return Optional.empty();
+        }
+        try (Stream<Path> files = Files.list(dir)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> normalize(cleanReleaseName(baseName(path.getFileName().toString()))).equals(normalizedTitle))
+                    .findFirst();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    private String baseName(String filename) {
+        int dot = filename.lastIndexOf('.');
+        return dot > 0 ? filename.substring(0, dot) : filename;
+    }
+
+    private String cleanReleaseName(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value
+                .replaceAll("(?i)[\\._-]+", " ")
+                .replaceAll("(?i)\\b(19|20)\\d{2}\\b.*$", "")
+                .replaceAll("(?i)\\b(480p|720p|1080p|2160p|4k|hdr|bluray|brrip|webrip|web-dl|x264|x265|hevc|aac|dual audio)\\b.*$", "")
+                .trim();
+    }
+
+    private String normalize(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "");
+    }
+
+    private String demoVideoUrl(String title) {
+        String key = title == null ? "" : title.toLowerCase(Locale.ROOT);
+        if (key.contains("interstellar")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+        }
+        if (key.contains("dark knight")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4";
+        }
+        if (key.contains("inception")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4";
+        }
+        if (key.contains("avatar")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4";
+        }
+        if (key.contains("matrix")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4";
+        }
+        if (key.contains("gladiator")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
+        }
+        if (key.contains("spirited")) {
+            return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4";
+        }
+        return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4";
     }
 }

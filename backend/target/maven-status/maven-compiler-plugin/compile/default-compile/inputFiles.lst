@@ -1,5 +1,8 @@
+I:\project\Netflix clone\backend\src\main\java\com\netflix\recommendation\entity\UserBehaviorEvent.java
+I:\project\Netflix clone\backend\src\main\java\com\netflix\recommendation\repository\UserBehaviorEventRepository.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\config\UserDataSeeder.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\controller\AdminController.java
+I:\project\Netflix clone\backend\src\main\java\com\netflix\recommendation\dto\BehaviorEventRequest.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\entity\Notification.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\movie\config\MovieDataSeeder.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\movie\dto\NetflixSyncResponse.java
@@ -30,6 +33,7 @@ I:\project\Netflix clone\backend\src\main\java\com\netflix\movie\dto\ReviewRespo
 I:\project\Netflix clone\backend\src\main\java\com\netflix\movie\entity\Movie.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\dto\LoginRequest.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\dto\ProfileRequest.java
+I:\project\Netflix clone\backend\src\main\java\com\netflix\recommendation\dto\RecommendationAnalyticsResponse.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\dto\CatalogMovieDto.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\service\NetflixCatalogService.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\controller\UserProfileController.java
@@ -59,6 +63,7 @@ I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\service\Con
 I:\project\Netflix clone\backend\src\main\java\com\netflix\movie\config\WebConfig.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\dto\OfflineImportResponse.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\entity\ContinueWatching.java
+I:\project\Netflix clone\backend\src\main\java\com\netflix\recommendation\service\AdvancedRecommendationService.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\user\dto\AdminUserSummaryResponse.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\dto\WatchlistResponse.java
 I:\project\Netflix clone\backend\src\main\java\com\netflix\watchlist\dto\CatalogRowDto.java

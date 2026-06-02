@@ -32,4 +32,16 @@ public class NotificationController {
         notificationService.markAsRead(auth.getName(), id);
         return ResponseEntity.noContent().build();
     }
+
+    @DeleteMapping
+    public ResponseEntity<Void> clearAll(Authentication auth) {
+        notificationService.clearAll(auth.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/clear")
+    public ResponseEntity<Void> clearAllFallback(Authentication auth) {
+        notificationService.clearAll(auth.getName());
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -12,4 +12,7 @@ public interface WatchlistRepository extends JpaRepository<Watchlist, Long> {
 
     @Transactional
     void deleteByUserIdAndMovieId(Long userId, Long movieId);
+
+    @Transactional
+    void deleteByUserId(Long userId);
 }

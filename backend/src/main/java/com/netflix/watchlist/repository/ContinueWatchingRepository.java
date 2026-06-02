@@ -13,4 +13,7 @@ public interface ContinueWatchingRepository extends JpaRepository<ContinueWatchi
 
     @Transactional
     void deleteByUserIdAndMovieId(Long userId, Long movieId);
+
+    @Transactional
+    void deleteByUserId(Long userId);
 }
