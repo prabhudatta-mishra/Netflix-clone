@@ -32,7 +32,9 @@ export const AuthProvider = ({ children }) => {
       const userData = {
         username: data.username || username,
         email: data.email,
-        role: data.role
+        role: data.role,
+        emailVerified: data.emailVerified,
+        paymentConfirmed: data.paymentConfirmed
       };
       localStorage.setItem('netflix_token', data.token);
       localStorage.setItem('netflix_user', JSON.stringify(userData));
@@ -61,15 +63,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (username, email, password) => {
+  const register = async (username, email, password, extras = {}) => {
     try {
-      const response = await api.post('/auth/register', { username, email, password });
+      const response = await api.post('/auth/register', { username, email, password, ...extras });
       const data = response.data;
       
       const userData = {
         username: data.username || username,
         email: data.email || email,
-        role: data.role || 'USER'
+        role: data.role || 'USER',
+        emailVerified: data.emailVerified,
+        paymentConfirmed: data.paymentConfirmed
       };
       localStorage.setItem('netflix_token', data.token);
       localStorage.setItem('netflix_user', JSON.stringify(userData));

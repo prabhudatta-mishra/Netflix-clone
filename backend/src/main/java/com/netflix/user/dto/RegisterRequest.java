@@ -17,6 +17,10 @@ public class RegisterRequest {
     @Size(min = 6, message = "Password must be at least 6 characters")
     private String password;
 
+    private Boolean emailVerified;
+    private Boolean paymentConfirmed;
+    private String paymentUpiId;
+
     public RegisterRequest() {}
 
     public String getUsername() { return username; }
@@ -27,4 +31,13 @@ public class RegisterRequest {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+    public Boolean getEmailVerified() { return emailVerified; }
+    public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public Boolean getPaymentConfirmed() { return paymentConfirmed; }
+    public void setPaymentConfirmed(Boolean paymentConfirmed) { this.paymentConfirmed = paymentConfirmed; }
+
+    public String getPaymentUpiId() { return paymentUpiId; }
+    public void setPaymentUpiId(String paymentUpiId) { this.paymentUpiId = paymentUpiId; }
 }

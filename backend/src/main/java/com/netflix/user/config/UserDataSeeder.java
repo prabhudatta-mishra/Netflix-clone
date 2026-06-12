@@ -25,8 +25,18 @@ public class UserDataSeeder implements ApplicationRunner {
             admin.setEmail("admin@netflix.com");
             admin.setPassword(passwordEncoder.encode("admin123"));
             admin.setRole("ADMIN");
+            admin.setEmailVerified(true);
+            admin.setPaymentConfirmed(true);
+            admin.setPaymentUpiId("8144517582@axl");
             userRepository.save(admin);
             System.out.println("Seeded admin / admin123");
+        } else {
+            userRepository.findByUsername("admin").ifPresent(admin -> {
+                admin.setEmailVerified(true);
+                admin.setPaymentConfirmed(true);
+                admin.setPaymentUpiId("8144517582@axl");
+                userRepository.save(admin);
+            });
         }
 
         if (!userRepository.existsByUsername("testuser")) {
@@ -35,8 +45,18 @@ public class UserDataSeeder implements ApplicationRunner {
             user.setEmail("testuser@gmail.com");
             user.setPassword(passwordEncoder.encode("password123"));
             user.setRole("USER");
+            user.setEmailVerified(true);
+            user.setPaymentConfirmed(true);
+            user.setPaymentUpiId("8144517582@axl");
             userRepository.save(user);
             System.out.println("Seeded testuser / password123");
+        } else {
+            userRepository.findByUsername("testuser").ifPresent(user -> {
+                user.setEmailVerified(true);
+                user.setPaymentConfirmed(true);
+                user.setPaymentUpiId("8144517582@axl");
+                userRepository.save(user);
+            });
         }
     }
 }

@@ -1,15 +1,23 @@
-import React from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NetflixFooter from '../components/NetflixFooter';
 import { Play, ChevronRight } from 'lucide-react';
 
 const Landing = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
 
   if (user) {
     return <Navigate to="/browse" replace />;
   }
+
+  const startSignup = (event) => {
+    event.preventDefault();
+    const query = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : '';
+    navigate(`/register${query}`);
+  };
 
   return (
     <div className="landing-page">
@@ -28,12 +36,19 @@ const Landing = () => {
         <h1>Unlimited movies, TV shows, and more</h1>
         <p className="landing-sub">Watch anywhere. Cancel anytime. Personalized rows powered by Netflix-style algorithms.</p>
         <p className="landing-cta-text">Ready to watch? Enter your email to create or restart your membership.</p>
-        <div className="landing-email-row">
-          <input type="email" placeholder="Email address" className="landing-email-input" readOnly onFocus={(e) => e.target.blur()} />
-          <Link to="/register" className="btn-primary landing-get-started">
+        <form className="landing-email-row" onSubmit={startSignup}>
+          <input
+            type="email"
+            placeholder="Email address"
+            className="landing-email-input"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+          <button type="submit" className="btn-primary landing-get-started">
             Get Started <ChevronRight size={20} />
-          </Link>
-        </div>
+          </button>
+        </form>
       </section>
 
       <section className="landing-features">

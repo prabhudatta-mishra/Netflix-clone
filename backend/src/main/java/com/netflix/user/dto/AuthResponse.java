@@ -6,6 +6,8 @@ public class AuthResponse {
     private String username;
     private String email;
     private String role;
+    private Boolean emailVerified;
+    private Boolean paymentConfirmed;
     private String message;
 
     public AuthResponse() {}
@@ -15,6 +17,17 @@ public class AuthResponse {
         this.username = username;
         this.email = email;
         this.role = role;
+        this.message = message;
+    }
+
+    public AuthResponse(String token, String username, String email, String role,
+                        Boolean emailVerified, Boolean paymentConfirmed, String message) {
+        this.token = token;
+        this.username = username;
+        this.email = email;
+        this.role = role;
+        this.emailVerified = emailVerified;
+        this.paymentConfirmed = paymentConfirmed;
         this.message = message;
     }
 
@@ -29,6 +42,12 @@ public class AuthResponse {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public Boolean getEmailVerified() { return emailVerified; }
+    public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public Boolean getPaymentConfirmed() { return paymentConfirmed; }
+    public void setPaymentConfirmed(Boolean paymentConfirmed) { this.paymentConfirmed = paymentConfirmed; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

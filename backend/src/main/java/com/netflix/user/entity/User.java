@@ -25,6 +25,15 @@ public class User {
     @Column(length = 50)
     private String role = "USER";
 
+    @Column(name = "email_verified")
+    private Boolean emailVerified = false;
+
+    @Column(name = "payment_confirmed")
+    private Boolean paymentConfirmed = false;
+
+    @Column(name = "payment_upi_id", length = 120)
+    private String paymentUpiId;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -47,6 +56,15 @@ public class User {
 
     public String getRole() { return role; }
     public void setRole(String role) { this.role = role; }
+
+    public Boolean getEmailVerified() { return emailVerified; }
+    public void setEmailVerified(Boolean emailVerified) { this.emailVerified = emailVerified; }
+
+    public Boolean getPaymentConfirmed() { return paymentConfirmed; }
+    public void setPaymentConfirmed(Boolean paymentConfirmed) { this.paymentConfirmed = paymentConfirmed; }
+
+    public String getPaymentUpiId() { return paymentUpiId; }
+    public void setPaymentUpiId(String paymentUpiId) { this.paymentUpiId = paymentUpiId; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

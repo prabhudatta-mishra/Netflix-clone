@@ -166,6 +166,128 @@ h1, h2, h3, h4, h5, h6 {
 .auth-switch a { color: #fff; text-decoration: none; font-weight: 500; margin-left: 6px; }
 .auth-demo-hint { margin-top: 1rem; font-size: 0.8rem; color: #666; text-align: center; }
 
+.signup-back-btn {
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: #d5d5d5;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  font-weight: 800;
+  margin: -8px 0 16px;
+}
+
+.signup-back-btn:hover {
+  color: #fff;
+}
+
+.signup-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 22px;
+}
+
+.signup-step {
+  min-height: 42px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  border-radius: 5px;
+  color: #8f8f8f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.signup-step.active {
+  color: #fff;
+  border-color: rgba(229,9,20,0.62);
+  background: rgba(229,9,20,0.16);
+}
+
+.signup-step.done {
+  color: #46d369;
+  border-color: rgba(70,211,105,0.42);
+  background: rgba(70,211,105,0.12);
+}
+
+.signup-panel {
+  display: grid;
+  gap: 14px;
+  color: #fff;
+  background: rgba(255,255,255,0.035);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 18px;
+}
+
+.signup-panel svg {
+  color: var(--netflix-red);
+}
+
+.signup-panel h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.signup-panel p {
+  color: #b7b7b7;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.verification-waiting {
+  border-left: 3px solid var(--netflix-red);
+  background: rgba(229,9,20,0.1);
+  padding: 10px 12px;
+  color: #f2f2f2 !important;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.upi-box {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  background: linear-gradient(180deg, #171717, #0d0d0d);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.upi-box span {
+  color: #8e8e8e;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.upi-box strong {
+  color: #fff;
+  font-size: 1.05rem;
+  margin-bottom: 7px;
+  word-break: break-word;
+}
+
+.payment-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ddd;
+  font-size: 0.92rem;
+}
+
+.payment-confirm input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--netflix-red);
+}
+
 .form-group {
   margin-bottom: 1.5rem;
   position: relative;
