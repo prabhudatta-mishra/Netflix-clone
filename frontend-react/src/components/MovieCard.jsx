@@ -39,7 +39,7 @@ const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, sho
 
   const handlePlayClick = (e) => {
     e.stopPropagation();
-    trackRecommendationEvent(api, { movieId: movie.id, eventType: 'PLAY', context: 'movie-card' });
+    trackRecommendationEvent(api, { movieId: movie.id, eventType: 'PLAY', context: 'movie-card' }).catch(() => {});
     navigate(`/watch/${movie.id}`);
   };
 
@@ -47,7 +47,7 @@ const MovieCard = ({ movie, isWatchlistItem, onWatchlistChange, onCardClick, sho
     <div
       className="movie-card animate-fade-in"
       onClick={() => {
-        trackRecommendationEvent(api, { movieId: movie.id, eventType: 'CLICK', context: 'movie-card' });
+        trackRecommendationEvent(api, { movieId: movie.id, eventType: 'CLICK', context: 'movie-card' }).catch(() => {});
         onCardClick?.(movie.id);
       }}
     >

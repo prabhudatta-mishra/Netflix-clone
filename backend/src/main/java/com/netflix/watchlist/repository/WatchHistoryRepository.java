@@ -9,6 +9,7 @@ import java.util.List;
 
 public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long> {
     List<WatchHistory> findByUserIdOrderByWatchedAtDesc(Long userId);
+    java.util.Optional<WatchHistory> findByUserIdAndMovieId(Long userId, Long movieId);
 
     @Query("SELECT DISTINCT m.genre FROM WatchHistory h, com.netflix.movie.entity.Movie m WHERE h.movieId = m.id AND h.userId = :userId")
     List<String> findWatchedGenresByUserId(Long userId);

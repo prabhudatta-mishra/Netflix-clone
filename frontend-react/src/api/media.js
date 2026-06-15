@@ -27,7 +27,7 @@ export const fetchPlaybackInfo = async (api, movieId) => {
 };
 
 export const trackRecommendationEvent = (api, event) => {
-  return api.post('/recommendations/events', event).catch(() => {});
+  return api.post('/recommendations/events', event);
 };
 
 export default origin;

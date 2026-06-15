@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Play, Search, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, Clock, Play, RotateCcw, Search, Trash2, XCircle } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import api from '../api/axios';
 import { resolveMediaUrl } from '../api/media';
@@ -8,6 +8,7 @@ import { resolveMediaUrl } from '../api/media';
 const History = () => {
   const navigate = useNavigate();
   const [history, setHistory] = useState([]);
+  const [continueMap, setContinueMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -20,8 +21,12 @@ const History = () => {
     try {
       setLoading(true);
       setError('');
-      const res = await api.get('/history');
-      setHistory(res.data || []);
+      const [historyRes, continueRes] = await Promise.all([
+        api.get('/history'),
+        api.get('/continue'),
+      ]);
+      setHistory(resUniqueHistory(historyRes.data || []));
+      setContinueMap(new Map((continueRes.data || []).map((item) => [item.movieId, item])));
     } catch (err) {
       setError(err.response?.data?.message || 'Could not load watch history.');
     } finally {
@@ -102,25 +107,38 @@ const History = () => {
           </div>
         ) : (
           <section style={listStyle}>
-            {filtered.map((item) => (
+            {filtered.map((item) => {
+              const progress = continueMap.get(item.movieId);
+              const percent = Math.min(100, Math.max(0, progress?.progressPercent || 0));
+              const completed = percent >= 90;
+              return (
               <article key={item.id} style={rowStyle}>
                 <button type="button" onClick={() => navigate(`/watch/${item.movieId}`)} style={thumbButtonStyle}>
                   <img src={resolveMediaUrl(item.thumbnailUrl)} alt="" style={thumbStyle} />
                   <span style={thumbOverlayStyle}><Play size={22} fill="#fff" /></span>
+                  {progress && (
+                    <span style={progressTrackStyle}>
+                      <span style={{ ...progressBarStyle, width: `${percent}%` }} />
+                    </span>
+                  )}
                 </button>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <h2 style={movieTitleStyle}>{item.title}</h2>
                   <p style={movieMetaStyle}>{item.genre || 'Movie'} - Watched {formatDate(item.watchedAt)}</p>
+                  <div style={resumeMetaStyle}>
+                    {completed ? <CheckCircle2 size={15} /> : <RotateCcw size={15} />}
+                    <span>{progress ? progressLabel(progress, completed) : 'Watched recently'}</span>
+                  </div>
                 </div>
                 <button type="button" className="btn-primary" style={playButtonStyle} onClick={() => navigate(`/watch/${item.movieId}`)}>
                   <Play size={16} />
-                  Play
+                  {progress && !completed ? 'Resume' : 'Play'}
                 </button>
                 <button type="button" title="Delete history item" style={deleteButtonStyle} onClick={() => deleteItem(item.id)}>
                   <Trash2 size={17} />
                 </button>
               </article>
-            ))}
+            );})}
           </section>
         )}
       </main>
@@ -129,6 +147,26 @@ const History = () => {
 };
 
 const formatDate = (value) => value ? new Date(value).toLocaleString() : 'recently';
+const formatTime = (seconds = 0) => {
+  const safe = Math.max(0, Number(seconds) || 0);
+  const h = Math.floor(safe / 3600);
+  const m = Math.floor((safe % 3600) / 60);
+  const s = Math.floor(safe % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+const progressLabel = (progress, completed) => {
+  if (completed) return 'Completed';
+  return `Resume from ${formatTime(progress.progressSeconds)} - ${progress.progressPercent || 0}% watched`;
+};
+const resUniqueHistory = (items = []) => {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.movieId)) return false;
+    seen.add(item.movieId);
+    return true;
+  });
+};
 
 const pageStyle = { padding: '104px 4% 48px', maxWidth: 1120, margin: '0 auto' };
 const heroStyle = { display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'flex-end', marginBottom: 28, flexWrap: 'wrap' };
@@ -146,6 +184,9 @@ const thumbStyle = { width: '100%', height: '100%', objectFit: 'cover', display:
 const thumbOverlayStyle = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', background: 'rgba(0,0,0,0.16)' };
 const movieTitleStyle = { margin: 0, fontSize: '1.05rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const movieMetaStyle = { margin: '6px 0 0', color: '#888', fontSize: '0.88rem' };
+const resumeMetaStyle = { display: 'inline-flex', alignItems: 'center', gap: 7, color: '#cfcfcf', fontSize: '0.83rem', marginTop: 8 };
+const progressTrackStyle = { position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, background: 'rgba(255,255,255,0.18)' };
+const progressBarStyle = { display: 'block', height: '100%', background: 'var(--netflix-red)' };
 const playButtonStyle = { height: 36, padding: '0 13px', display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 };
 const deleteButtonStyle = { width: 36, height: 36, borderRadius: 6, border: '1px solid #333', background: '#191919', color: 'var(--netflix-red)', display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 };
 const loadingStyle = { minHeight: 360, display: 'grid', placeItems: 'center', color: '#999' };

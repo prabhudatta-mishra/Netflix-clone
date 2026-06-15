@@ -1433,3 +1433,335 @@ select:focus-visible {
     height: 148px;
   }
 }
+
+/* ==========================================================================
+   Submission polish layer: presentation-ready UX across pages
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: rgba(229, 9, 20, 0.55);
+  color: #fff;
+}
+
+.page-home,
+.page-details,
+.landing-page,
+.auth-page,
+.profiles-page {
+  isolation: isolate;
+}
+
+.page-home::before,
+.page-details::before,
+.profiles-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.025), transparent 220px),
+    radial-gradient(circle at 92% 12%, rgba(229,9,20,0.08), transparent 26%);
+}
+
+.empty-text,
+.error-panel {
+  color: #a7a7a7;
+  background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.018));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  margin: 18px 4%;
+}
+
+.empty-text {
+  padding: 26px 28px;
+}
+
+.error-panel {
+  max-width: 720px;
+  margin: 140px auto 40px;
+  padding: 42px 28px;
+}
+
+.error-panel h2 {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+}
+
+.section-title,
+.carousel-header {
+  text-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+
+.carousel-section:hover .carousel-title {
+  color: #fff;
+}
+
+.carousel-track {
+  scroll-snap-type: x proximity;
+}
+
+.carousel-item,
+.movie-card,
+.continue-card,
+.ai-card {
+  scroll-snap-align: start;
+}
+
+.movie-card,
+.continue-card,
+.history-card,
+.ai-card,
+.review-item,
+.profile-card-section,
+.notification-panel {
+  outline: 1px solid transparent;
+}
+
+.movie-card:focus-within,
+.continue-card:focus-within,
+.history-card:focus-within,
+.ai-card:focus-within {
+  outline-color: rgba(229, 9, 20, 0.55);
+}
+
+.movie-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent 54%, rgba(0,0,0,0.18));
+}
+
+.movie-card-body,
+.movie-card-overlay,
+.movie-hover-preview {
+  position: relative;
+  z-index: 1;
+}
+
+.movie-list-toggle:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.details-body {
+  width: min(1180px, 92vw);
+  margin: 0 auto;
+}
+
+.details-actions .btn-secondary,
+.details-actions .btn-primary {
+  min-height: 46px;
+}
+
+.review-section {
+  background: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.018));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.review-form textarea,
+.review-form select,
+.form-control,
+.landing-email-input,
+.search-bar-wrap input {
+  caret-color: var(--netflix-red);
+}
+
+.review-form textarea:focus,
+.review-form select:focus,
+.landing-email-input:focus {
+  border-color: rgba(229,9,20,0.58);
+  box-shadow: 0 0 0 3px rgba(229,9,20,0.16);
+  outline: 0;
+}
+
+.history-grid,
+.landing-features {
+  align-items: stretch;
+}
+
+.history-card {
+  min-height: 92px;
+}
+
+.history-card,
+.continue-card,
+.ai-card,
+.landing-feature-card,
+.profile-card-section {
+  box-shadow: 0 16px 45px rgba(0,0,0,0.2);
+}
+
+.profile-card {
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.profile-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 4px;
+}
+
+.auth-card,
+.signup-panel {
+  animation: fadeIn 0.32s ease both;
+}
+
+.toast {
+  border: 1px solid rgba(255,255,255,0.1);
+  backdrop-filter: blur(14px);
+}
+
+.notification-item {
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.notification-item:hover {
+  transform: translateX(-2px);
+}
+
+.admin-stats-grid .glass-panel,
+.admin-main-grid .glass-panel,
+.admin-secondary-grid .glass-panel {
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.admin-stats-grid .glass-panel:hover,
+.admin-main-grid .glass-panel:hover,
+.admin-secondary-grid .glass-panel:hover {
+  border-color: rgba(255,255,255,0.18);
+}
+
+@media (max-width: 1024px) {
+  .netflix-nav {
+    flex-wrap: wrap;
+  }
+  .netflix-nav-left,
+  .netflix-nav-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .netflix-nav-links {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  .netflix-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+  .search-bar-wrap input {
+    width: min(220px, 42vw);
+  }
+}
+
+@media (max-width: 640px) {
+  .toast-container {
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
+  }
+  .toast {
+    max-width: none;
+  }
+  .landing-header,
+  .auth-header {
+    padding: 18px 5%;
+  }
+  .landing-header-actions {
+    gap: 8px;
+  }
+  .landing-btn-signin {
+    min-height: 36px;
+    padding-inline: 12px;
+  }
+  .auth-card {
+    padding: 28px 20px;
+  }
+  .signup-steps {
+    grid-template-columns: 1fr;
+  }
+  .hero-banner {
+    min-height: 640px;
+  }
+  .hero-content {
+    padding-left: 5%;
+    padding-right: 5%;
+  }
+  .hero-actions .btn-primary,
+  .hero-actions .btn-secondary {
+    flex: 1 1 140px;
+    justify-content: center;
+  }
+  .home-content.with-hero {
+    margin-top: -28px;
+  }
+  .carousel-section {
+    padding-left: 5%;
+  }
+  .carousel-header {
+    padding-right: 5%;
+  }
+  .search-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding: 0 5%;
+  }
+  .movie-card {
+    height: 264px;
+  }
+  .movie-card-thumb {
+    height: 132px;
+  }
+  .movie-card-body {
+    padding: 11px;
+  }
+  .movie-hover-preview {
+    display: none;
+  }
+  .details-hero {
+    min-height: 680px;
+    align-items: flex-end;
+  }
+  .details-hero-content {
+    padding: 0 5% 48px;
+  }
+  .details-actions .btn-primary,
+  .details-actions .btn-secondary {
+    flex: 1 1 150px;
+    justify-content: center;
+  }
+  .details-body {
+    width: 90vw;
+  }
+  .review-section {
+    padding: 18px;
+  }
+  .profiles-grid {
+    gap: 14px;
+  }
+  .profile-avatar {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+@media (max-width: 760px) {
+  .modal-details-grid,
+  .modal-recommendation-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .modal-action-row .btn-primary {
+    flex: 1 1 150px;
+    justify-content: center;
+  }
+}

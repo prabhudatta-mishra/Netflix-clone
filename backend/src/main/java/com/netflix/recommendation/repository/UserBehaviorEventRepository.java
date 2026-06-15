@@ -12,6 +12,9 @@ public interface UserBehaviorEventRepository extends JpaRepository<UserBehaviorE
     List<UserBehaviorEvent> findByUserIdOrderByCreatedAtDesc(Long userId);
     List<UserBehaviorEvent> findTop100ByUserIdOrderByCreatedAtDesc(Long userId);
 
+    @Query("SELECT e FROM UserBehaviorEvent e WHERE e.eventType IN ('LIKE', 'DISLIKE') ORDER BY e.createdAt DESC")
+    List<UserBehaviorEvent> findFeedbackEventsOrderByCreatedAtDesc();
+
     @Query("SELECT e.movieId, COUNT(e) FROM UserBehaviorEvent e WHERE e.movieId IS NOT NULL AND e.createdAt >= :since GROUP BY e.movieId ORDER BY COUNT(e) DESC")
     List<Object[]> countEventsByMovieSince(LocalDateTime since);
 

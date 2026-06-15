@@ -6,10 +6,10 @@ import com.netflix.movie.util.VideoFileValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -45,9 +45,14 @@ public class MovieStreamController {
         String videoUrl = movie.getVideoUrl();
         Optional<Path> localMatch = findMatchingLocalVideo(movie.getTitle());
         boolean seededDemoUrl = videoUrl != null && videoUrl.contains("commondatastorage.googleapis.com/gtv-videos-bucket/sample");
+        Optional<Path> localDemo = findAnyLocalVideo();
 
         if (localMatch.isPresent() && (videoUrl == null || videoUrl.isBlank() || seededDemoUrl)) {
             return streamLocalFile(localMatch.get(), headers);
+        }
+
+        if (localDemo.isPresent() && (videoUrl == null || videoUrl.isBlank() || seededDemoUrl)) {
+            return streamLocalFile(localDemo.get(), headers);
         }
 
         if (videoUrl == null || videoUrl.isBlank()) {
@@ -89,21 +94,9 @@ public class MovieStreamController {
         long start = range.getRangeStart(contentLength);
         long end = Math.min(range.getRangeEnd(contentLength), contentLength - 1);
         long rangeLength = end - start + 1;
-        StreamingResponseBody body = outputStream -> {
-            try (InputStream inputStream = Files.newInputStream(file)) {
-                inputStream.skipNBytes(start);
-                byte[] buffer = new byte[64 * 1024];
-                long remaining = rangeLength;
-                while (remaining > 0) {
-                    int read = inputStream.read(buffer, 0, (int) Math.min(buffer.length, remaining));
-                    if (read == -1) {
-                        break;
-                    }
-                    outputStream.write(buffer, 0, read);
-                    remaining -= read;
-                }
-            }
-        };
+        InputStream inputStream = Files.newInputStream(file);
+        inputStream.skipNBytes(start);
+        InputStreamResource body = new InputStreamResource(inputStream);
 
         return ResponseEntity.status(HttpStatus.PARTIAL_CONTENT)
                 .contentType(mediaType)
@@ -151,6 +144,21 @@ public class MovieStreamController {
                     .filter(Files::isRegularFile)
                     .filter(path -> VideoFileValidator.isAllowedVideoFilename(path.getFileName().toString()))
                     .filter(path -> normalize(cleanReleaseName(baseName(path.getFileName().toString()))).equals(normalizedTitle))
+                    .findFirst();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<Path> findAnyLocalVideo() {
+        Path uploads = Paths.get(uploadDir).toAbsolutePath().normalize().resolve("videos");
+        if (!Files.isDirectory(uploads)) {
+            return Optional.empty();
+        }
+        try (Stream<Path> files = Files.list(uploads)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".mp4"))
                     .findFirst();
         } catch (IOException e) {
             return Optional.empty();

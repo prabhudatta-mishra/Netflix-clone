@@ -2,6 +2,8 @@ package com.netflix.user.controller;
 
 import com.netflix.movie.dto.NetflixSyncResponse;
 import com.netflix.movie.service.NetflixMediaSyncService;
+import com.netflix.user.dto.AdminFeedbackResponse;
+import com.netflix.user.dto.AdminHealthResponse;
 import com.netflix.user.dto.AdminStatsResponse;
 import com.netflix.user.dto.AdminUserSummaryResponse;
 import com.netflix.user.dto.OfflineImportResponse;
@@ -45,6 +47,16 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<AdminUserSummaryResponse>> getUsers() {
         return ResponseEntity.ok(adminDashboardService.getAllUsersWithActivity());
+    }
+
+    @GetMapping("/feedback")
+    public ResponseEntity<List<AdminFeedbackResponse>> getFeedback() {
+        return ResponseEntity.ok(adminDashboardService.getRecentFeedback());
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<AdminHealthResponse> getHealth() {
+        return ResponseEntity.ok(adminDashboardService.getHealth());
     }
 
     @DeleteMapping("/users/by-username/{username}")

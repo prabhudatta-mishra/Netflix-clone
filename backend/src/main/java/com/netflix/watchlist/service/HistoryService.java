@@ -10,6 +10,7 @@ import com.netflix.watchlist.repository.WatchHistoryRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,9 +40,11 @@ public class HistoryService {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new RuntimeException("Movie not found"));
 
-        WatchHistory history = new WatchHistory();
+        WatchHistory history = watchHistoryRepository.findByUserIdAndMovieId(user.getId(), movieId)
+                .orElseGet(WatchHistory::new);
         history.setUserId(user.getId());
         history.setMovieId(movieId);
+        history.setWatchedAt(LocalDateTime.now());
         WatchHistory saved = watchHistoryRepository.save(history);
 
         notificationService.createNotification(username, "Watch recorded",

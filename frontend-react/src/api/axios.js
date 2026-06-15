@@ -17,6 +17,18 @@ const api = axios.create({
   withCredentials: false,
 });
 
+const RETRYABLE_METHODS = new Set(['get', 'head', 'options']);
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+let healingState = 'healthy';
+
+function emitHealing(status, detail = '') {
+  if (status === 'healthy' && healingState === 'healthy') return;
+  healingState = status;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('self-healing-status', { detail: { status, detail } }));
+  }
+}
+
 function setHeader(config, key, value) {
   if (config.headers && typeof config.headers.set === 'function') {
     config.headers.set(key, value);
@@ -53,8 +65,11 @@ api.interceptors.request.use(
 );
 
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response) => {
+    emitHealing('healthy');
+    return response;
+  },
+  async (error) => {
     if (error.response?.status === 401) {
       const requestUrl = error.config?.url || '';
       const isAuthEndpoint = requestUrl.includes('/auth/');
@@ -67,6 +82,24 @@ api.interceptors.response.use(
           window.location.href = '/login';
         }
       }
+    }
+
+    const config = error.config || {};
+    const method = String(config.method || 'get').toLowerCase();
+    const status = error.response?.status;
+    const retryableStatus = !status || status === 408 || status === 429 || status >= 500;
+    const retryableMethod = RETRYABLE_METHODS.has(method);
+    const retryCount = config.__retryCount || 0;
+
+    if (retryableMethod && retryableStatus && retryCount < 2) {
+      config.__retryCount = retryCount + 1;
+      emitHealing('healing', `Retrying ${config.url || 'request'} (${config.__retryCount}/2)`);
+      await wait(500 * config.__retryCount);
+      return api(config);
+    }
+
+    if (retryableStatus) {
+      emitHealing('failed', 'Backend connection needs attention');
     }
     return Promise.reject(error);
   }

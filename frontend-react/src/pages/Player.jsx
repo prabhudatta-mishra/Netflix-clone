@@ -99,8 +99,11 @@ const Player = () => {
   const recordHistoryOnce = () => {
     if (historyRecorded.current) return;
     historyRecorded.current = true;
-    api.post(`/history/${id}`).catch(() => {});
-    trackRecommendationEvent(api, { movieId: Number(id), eventType: 'PLAY', context: 'player' });
+    api.post(`/history/${id}`).catch((err) => {
+      historyRecorded.current = false;
+      console.error('Watch history save failed', err);
+    });
+    trackRecommendationEvent(api, { movieId: Number(id), eventType: 'PLAY', context: 'player' }).catch(() => {});
   };
 
   // Bind Keyboard Shortcuts
@@ -202,7 +205,7 @@ const Player = () => {
           eventType: 'PLAY',
           watchSeconds: Math.floor(time),
           context: 'progress',
-        });
+        }).catch(() => {});
       }
       if (time >= 5 && time <= 25) {
         setShowSkipIntro(true);
@@ -423,6 +426,11 @@ const Player = () => {
           playsInline
           preload="auto"
           onClick={handlePlayPause}
+          onPlay={() => {
+            setIsPlaying(true);
+            recordHistoryOnce();
+          }}
+          onPause={() => setIsPlaying(false)}
           onTimeUpdate={handleTimeUpdate}
           onLoadedMetadata={() => {
             setVideoError('');

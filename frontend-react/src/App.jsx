@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import SelfHealingStatus from './components/SelfHealingStatus';
 
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -21,6 +22,7 @@ function App() {
     <AuthProvider>
       <ToastProvider>
         <Router>
+          <SelfHealingStatus />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

@@ -8,7 +8,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,7 +21,7 @@ public class MovieService {
     private MovieRepository movieRepository;
 
     public List<MovieResponse> getAllMovies() {
-        return movieRepository.findAll().stream().map(this::toResponse).collect(Collectors.toList());
+        return uniqueMovies(movieRepository.findAll()).stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public MovieResponse getMovieById(Long id) {
@@ -28,12 +31,12 @@ public class MovieService {
     }
 
     public List<MovieResponse> searchMovies(String title) {
-        return movieRepository.findByTitleContainingIgnoreCase(title)
+        return uniqueMovies(movieRepository.findByTitleContainingIgnoreCase(title))
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     public List<MovieResponse> getMoviesByGenre(String genre) {
-        return movieRepository.findByGenreIgnoreCase(genre)
+        return uniqueMovies(movieRepository.findByGenreIgnoreCase(genre))
                 .stream().map(this::toResponse).collect(Collectors.toList());
     }
 
@@ -84,6 +87,18 @@ public class MovieService {
         movie.setVideoUrl(request.getVideoUrl());
         movie.setFallbackVideoUrls(request.getFallbackVideoUrls());
         movie.setRating(request.getRating());
+    }
+
+    private List<Movie> uniqueMovies(List<Movie> movies) {
+        Map<String, Movie> byTitle = new LinkedHashMap<>();
+        movies.stream()
+                .sorted(Comparator.comparing(Movie::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .forEach(movie -> byTitle.putIfAbsent(normalizeTitle(movie.getTitle()), movie));
+        return List.copyOf(byTitle.values());
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? "" : title.trim().replaceAll("\\s+", " ").toLowerCase();
     }
 
     private MovieResponse toResponse(Movie movie) {

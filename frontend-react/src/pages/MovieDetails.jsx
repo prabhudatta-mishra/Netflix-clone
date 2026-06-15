@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Play, Plus, Check } from 'lucide-react';
+import { BadgeCheck, Check, Clock3, Languages, Play, Plus, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import ReviewSection from '../components/ReviewSection';
 import MovieCarousel from '../components/MovieCarousel';
 import api from '../api/axios';
-import { resolveMediaUrl } from '../api/media';
+import { resolveMediaUrl, trackRecommendationEvent } from '../api/media';
+import { useToast } from '../context/ToastContext';
 
 const MovieDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [movie, setMovie] = useState(null);
   const [similar, setSimilar] = useState([]);
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistIds, setWatchlistIds] = useState(new Set());
+  const [feedback, setFeedback] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,6 +77,18 @@ const MovieDetails = () => {
     }
   };
 
+  const sendFeedback = async (eventType) => {
+    if (!movie) return;
+    try {
+      await trackRecommendationEvent(api, { movieId: movie.id, eventType, context: 'movie-details' });
+      setFeedback(eventType);
+      toast?.success?.(eventType === 'LIKE' ? 'Like sent to admin' : 'Dislike sent to admin');
+    } catch (err) {
+      console.error('Feedback event failed', err);
+      toast?.error?.('Feedback not saved. Please login again or restart backend.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="details-loading">
@@ -113,11 +128,38 @@ const MovieDetails = () => {
               {inWatchlist ? <Check size={20} /> : <Plus size={20} />}
               {inWatchlist ? 'In My List' : 'My List'}
             </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              title="Improve recommendations"
+              onClick={() => sendFeedback('LIKE')}
+              style={feedback === 'LIKE' ? activeFeedbackButtonStyle : undefined}
+            >
+              <ThumbsUp size={19} />
+              Like
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              title="Show less like this"
+              onClick={() => sendFeedback('DISLIKE')}
+              style={feedback === 'DISLIKE' ? activeFeedbackButtonStyle : undefined}
+            >
+              <ThumbsDown size={19} />
+              Not for me
+            </button>
           </div>
         </div>
       </div>
 
       <div className="details-body">
+        <section style={detailsInfoGridStyle}>
+          <InfoTile icon={<Clock3 size={19} />} label="Runtime" value={runtimeLabel(movie)} />
+          <InfoTile icon={<Languages size={19} />} label="Audio" value={audioLabel(movie)} />
+          <InfoTile icon={<BadgeCheck size={19} />} label="Playback" value={playbackLabel(movie)} />
+          <InfoTile icon={<Sparkles size={19} />} label="Why this fits" value={similar[0]?.aiReason || `Because you watched ${movie.genre || 'similar'} titles`} />
+        </section>
+
         {similar.length > 0 && (
           <MovieCarousel
             title="More Like This"
@@ -140,6 +182,61 @@ const MovieDetails = () => {
       </div>
     </div>
   );
+};
+
+const InfoTile = ({ icon, label, value }) => (
+  <div style={infoTileStyle}>
+    <span style={infoIconStyle}>{icon}</span>
+    <span style={{ minWidth: 0 }}>
+      <span style={infoLabelStyle}>{label}</span>
+      <span style={infoValueStyle}>{value}</span>
+    </span>
+  </div>
+);
+
+const runtimeLabel = (movie) => movie.duration || movie.runtime || 'Full movie';
+const audioLabel = (movie) => movie.videoUrl?.includes('/uploads/') ? 'Local MP4 audio' : 'Stream audio';
+const playbackLabel = (movie) => {
+  if (movie.videoUrl?.startsWith('/uploads/')) return 'Local file';
+  if (movie.videoUrl?.includes('commondatastorage.googleapis.com')) return 'Demo fallback';
+  if (movie.videoUrl) return 'External stream';
+  return 'Needs MP4';
+};
+
+const activeFeedbackButtonStyle = { borderColor: 'var(--netflix-red)', background: 'rgba(229,9,20,0.28)' };
+const detailsInfoGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+  gap: 12,
+  marginBottom: 24,
+};
+const infoTileStyle = {
+  display: 'flex',
+  gap: 11,
+  alignItems: 'center',
+  background: '#111',
+  border: '1px solid #282828',
+  borderRadius: 8,
+  padding: 14,
+  minWidth: 0,
+};
+const infoIconStyle = { color: 'var(--netflix-red)', display: 'flex', flexShrink: 0 };
+const infoLabelStyle = {
+  display: 'block',
+  color: '#8f8f8f',
+  fontSize: '0.74rem',
+  fontWeight: 800,
+  textTransform: 'uppercase',
+};
+const infoValueStyle = {
+  display: 'block',
+  color: '#fff',
+  fontSize: '0.9rem',
+  fontWeight: 800,
+  marginTop: 3,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
 };
 
 export default MovieDetails;

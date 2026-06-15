@@ -1,16 +1,19 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Play, Plus, Check, Star, Calendar, Film } from 'lucide-react';
+import { X, Play, Plus, Check, Star, ThumbsDown, ThumbsUp } from 'lucide-react';
 import api from '../api/axios';
-import { resolveMediaUrl } from '../api/media';
+import { resolveMediaUrl, trackRecommendationEvent } from '../api/media';
+import { useToast } from '../context/ToastContext';
 
 const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [movie, setMovie] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [inWatchlist, setInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
     const fetchMovieData = async () => {
@@ -21,6 +24,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
         const movieData = response.data;
         setMovie(movieData);
         setInWatchlist(watchlistIds.has(movieData.id));
+        setFeedback('');
 
         // Fetch recommendations (movies of the same genre, excluding current)
         const genreResponse = await api.get(`/movies/genre/${movieData.genre}`);
@@ -55,6 +59,18 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
       console.error('Watchlist modification failed in modal', err);
     } finally {
       setWatchlistLoading(false);
+    }
+  };
+
+  const sendFeedback = async (eventType) => {
+    if (!movie) return;
+    try {
+      await trackRecommendationEvent(api, { movieId: movie.id, eventType, context: 'movie-modal' });
+      setFeedback(eventType);
+      toast?.success?.(eventType === 'LIKE' ? 'Like sent to admin' : 'Dislike sent to admin');
+    } catch (err) {
+      console.error('Feedback event failed', err);
+      toast?.error?.('Feedback not saved. Please login again or restart backend.');
     }
   };
 
@@ -146,7 +162,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
                   fontFamily: 'var(--font-display)'
                 }}>{movie.title}</h1>
 
-                <div style={{ display: 'flex', gap: '15px' }}>
+                <div className="modal-action-row" style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
                   <button 
                     onClick={() => navigate(`/watch/${movie.id}`)}
                     className="btn-primary"
@@ -161,18 +177,48 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
                     disabled={watchlistLoading}
                     className="btn-secondary"
                     style={{
-                      padding: '0.7rem 1.4rem',
+                      padding: '0 1.05rem',
                       background: 'rgba(255, 255, 255, 0.1)',
                       border: '1px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '50%',
-                      width: '44px',
+                      borderRadius: '999px',
+                      minWidth: '112px',
                       height: '44px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      gap: '8px',
+                      color: '#fff',
+                      fontWeight: 800
                     }}
                   >
                     {inWatchlist ? <Check size={20} color="#46d369" /> : <Plus size={20} />}
+                    {inWatchlist ? 'Saved' : 'My List'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => sendFeedback('LIKE')}
+                    title="Improve recommendations"
+                    aria-label="Like this movie"
+                    style={{
+                      ...modalFeedbackButtonStyle,
+                      ...(feedback === 'LIKE' ? modalFeedbackActiveStyle : {}),
+                    }}
+                  >
+                    <ThumbsUp size={19} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => sendFeedback('DISLIKE')}
+                    title="Show less like this"
+                    aria-label="Not for me"
+                    style={{
+                      ...modalFeedbackButtonStyle,
+                      ...(feedback === 'DISLIKE' ? modalFeedbackActiveStyle : {}),
+                    }}
+                  >
+                    <ThumbsDown size={19} />
                   </button>
                 </div>
               </div>
@@ -180,7 +226,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
 
             {/* Modal Details Grid */}
             <div style={{ padding: '40px', display: 'flex', flexDirection: 'column', gap: '40px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px' }}>
+              <div className="modal-details-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '40px' }}>
                 {/* Left side: desc */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px', fontSize: '0.95rem' }}>
@@ -233,7 +279,7 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
                     fontFamily: 'var(--font-display)'
                   }}>More Like This</h3>
 
-                  <div style={{
+                  <div className="modal-recommendation-grid" style={{
                     display: 'grid',
                     gridTemplateColumns: 'repeat(2, 1fr)',
                     gap: '20px'
@@ -335,6 +381,24 @@ const MovieModal = ({ movieId, onClose, onWatchlistChange, watchlistIds }) => {
       </div>
     </div>
   );
+};
+
+const modalFeedbackButtonStyle = {
+  width: '44px',
+  height: '44px',
+  borderRadius: '50%',
+  border: '1px solid rgba(255,255,255,0.5)',
+  background: 'rgba(255,255,255,0.1)',
+  color: '#fff',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  cursor: 'pointer',
+};
+
+const modalFeedbackActiveStyle = {
+  borderColor: 'var(--netflix-red)',
+  background: 'rgba(229,9,20,0.38)',
 };
 
 export default MovieModal;

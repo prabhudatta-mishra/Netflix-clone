@@ -35,6 +35,7 @@ public class NetflixPlaybackService {
         String videoUrl = movie.getVideoUrl();
         Optional<Path> localMatch = findMatchingLocalVideo(movie.getTitle());
         boolean seededDemoUrl = videoUrl != null && videoUrl.contains("commondatastorage.googleapis.com/gtv-videos-bucket/sample");
+        Optional<Path> localDemo = findAnyLocalVideo();
 
         if (localMatch.isPresent() && (videoUrl == null || videoUrl.isBlank() || seededDemoUrl)) {
             Path file = localMatch.get();
@@ -43,6 +44,15 @@ public class NetflixPlaybackService {
                     "local", "byte-range", extension(file.getFileName().toString()),
                     codecHint(file.getFileName().toString()), fileSize(file), true,
                     "Local file takes priority over demo URLs.");
+        }
+
+        if (localDemo.isPresent() && (videoUrl == null || videoUrl.isBlank() || seededDemoUrl)) {
+            Path file = localDemo.get();
+            return plan(movie, streamUrl, true,
+                    "Ready to play local demo file: " + file.getFileName(),
+                    "local", "byte-range", extension(file.getFileName().toString()),
+                    codecHint(file.getFileName().toString()), fileSize(file), true,
+                    "Local demo file is used for movies without a specific local video.");
         }
 
         if (videoUrl == null || videoUrl.isBlank()) {
@@ -172,6 +182,21 @@ public class NetflixPlaybackService {
             return files
                     .filter(Files::isRegularFile)
                     .filter(path -> normalize(cleanReleaseName(baseName(path.getFileName().toString()))).equals(normalizedTitle))
+                    .findFirst();
+        } catch (IOException e) {
+            return Optional.empty();
+        }
+    }
+
+    private Optional<Path> findAnyLocalVideo() {
+        Path uploads = Paths.get(uploadDir).toAbsolutePath().normalize().resolve("videos");
+        if (!Files.isDirectory(uploads)) {
+            return Optional.empty();
+        }
+        try (Stream<Path> files = Files.list(uploads)) {
+            return files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".mp4"))
                     .findFirst();
         } catch (IOException e) {
             return Optional.empty();

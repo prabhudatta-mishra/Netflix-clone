@@ -28,6 +28,8 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [movies, setMovies] = useState([]);
   const [users, setUsers] = useState([]);
+  const [feedbackEvents, setFeedbackEvents] = useState([]);
+  const [health, setHealth] = useState(null);
   const [stats, setStats] = useState({ totalMovies: 0, totalUsers: 0, totalWatchlists: 0 });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -46,6 +48,16 @@ const AdminDashboard = () => {
   }, []);
 
   useEffect(() => {
+    const refreshAfterRecovery = (event) => {
+      if (event.detail?.status === 'healthy') {
+        fetchDashboardData();
+      }
+    };
+    window.addEventListener('self-healing-status', refreshAfterRecovery);
+    return () => window.removeEventListener('self-healing-status', refreshAfterRecovery);
+  }, []);
+
+  useEffect(() => {
     if (users.length === 0) {
       setSelectedUserId(null);
       return;
@@ -59,15 +71,19 @@ const AdminDashboard = () => {
     setLoading(true);
     setError('');
     try {
-      const [moviesRes, statsRes, usersRes, inboxRes] = await Promise.all([
+      const [moviesRes, statsRes, usersRes, feedbackRes, healthRes, inboxRes] = await Promise.all([
         api.get('/movies'),
         api.get('/admin/stats'),
         api.get('/admin/users'),
+        api.get('/admin/feedback'),
+        api.get('/admin/health'),
         api.get('/admin/offline-inbox'),
       ]);
-      setMovies(moviesRes.data || []);
+      setMovies(uniqueByMovie(moviesRes.data || []));
       setStats(statsRes.data || {});
-      setUsers(usersRes.data || []);
+      setUsers(uniqueByUser(usersRes.data || []));
+      setFeedbackEvents(uniqueFeedback(feedbackRes.data || []));
+      setHealth(healthRes.data || null);
       setOfflineFolder(inboxRes.data?.folder || 'backend/offline-import');
     } catch (err) {
       setError(err.response?.data?.message || 'Start backend on port 8080, then refresh the admin dashboard.');
@@ -242,6 +258,7 @@ const AdminDashboard = () => {
     if (!term) return users;
     return users.filter((u) =>
       [u.username, u.email, u.role, ...(u.watchedMovies || []), ...(u.watchlistMovies || [])]
+        .concat([...(u.likedMovies || []), ...(u.dislikedMovies || [])])
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term))
     );
@@ -260,34 +277,56 @@ const AdminDashboard = () => {
     <div style={{ minHeight: '100vh', backgroundColor: 'var(--bg-black)', paddingBottom: '4rem' }}>
       <Navbar />
 
-      <main style={{ padding: '104px 4% 0', maxWidth: 1280, margin: '0 auto' }}>
+      <main style={{ padding: '104px 4% 0', maxWidth: 1280, margin: '0 auto', display: 'flex', flexDirection: 'column' }}>
         <section style={headerStyle}>
           <div>
             <p style={eyebrowStyle}>Admin control center</p>
-            <h1 style={titleStyle}>User Activity Dashboard</h1>
+            <h1 style={titleStyle}>Admin Dashboard</h1>
             <p style={subtitleStyle}>
               Signed in as <strong style={{ color: '#fff' }}>{loggedInAdmin?.username || 'admin'}</strong>.
-              Track users, playable movies, watch history, and watchlists from one screen.
+              Add movies, sync local files, test playback, and review user feedback.
             </p>
           </div>
-          <button type="button" className="btn-primary" onClick={handleSyncMovies} disabled={syncing} style={syncButtonStyle}>
-            <RefreshCw size={20} className={syncing ? 'spin' : ''} />
-            {syncing ? 'Syncing' : 'Sync Movies'}
-          </button>
+          <div style={headerActionsStyle}>
+            <button type="button" className="btn-primary" onClick={handleSyncMovies} disabled={syncing} style={syncButtonStyle}>
+              <RefreshCw size={20} className={syncing ? 'spin' : ''} />
+              {syncing ? 'Syncing' : 'Sync Movies'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={fetchDashboardData} disabled={loading} style={syncButtonStyle}>
+              <RefreshCw size={20} className={loading ? 'spin' : ''} />
+              Refresh
+            </button>
+          </div>
         </section>
 
         {success && <Alert type="success">{success}</Alert>}
         {error && <Alert type="error">{error}</Alert>}
 
-        <section className="admin-stats-grid" style={statsGridStyle}>
+        <section className="admin-stats-grid" style={{ ...statsGridStyle, order: 1 }}>
           <StatCard icon={<Film size={22} />} label="Catalog movies" value={stats.totalMovies || movies.length} note={`${dashboardStats.playableMovies} with video`} />
           <StatCard icon={<Users size={22} />} label="Users" value={stats.totalUsers || users.length} note={`${dashboardStats.activeUsers} active`} />
           <StatCard icon={<Eye size={22} />} label="Watched titles" value={dashboardStats.watchedCount} note="Unique per user" />
           <StatCard icon={<Bookmark size={22} />} label="Watchlist saves" value={stats.totalWatchlists || 0} note="Across all users" />
         </section>
 
-        <section className="admin-main-grid" style={mainGridStyle}>
-          <div className="glass-panel" style={panelStyle}>
+        <section className="glass-panel" style={healthPanelStyle}>
+          <div>
+            <h2 style={sectionTitleStyle}>System Health</h2>
+            <p style={mutedTextStyle}>Quick demo check for backend, database, media, feedback, and history.</p>
+          </div>
+          <div style={healthGridStyle}>
+            <HealthChip label="Backend" value={health?.backendOnline ? 'Online' : 'Offline'} ok={Boolean(health?.backendOnline)} />
+            <HealthChip label="Database" value={health?.databaseOnline ? 'Connected' : 'Offline'} ok={Boolean(health?.databaseOnline)} />
+            <HealthChip label="Catalog" value={`${health?.catalogMovies ?? movies.length} movies`} ok={(health?.catalogMovies ?? movies.length) > 0} />
+            <HealthChip label="Local MP4" value={`${health?.localVideos ?? 0} files`} ok={(health?.localVideos ?? 0) > 0} />
+            <HealthChip label="Feedback" value={`${health?.feedbackEvents ?? feedbackEvents.length} events`} ok={(health?.feedbackEvents ?? feedbackEvents.length) >= 0} />
+            <HealthChip label="History" value={`${health?.watchHistoryEvents ?? 0} events`} ok={(health?.watchHistoryEvents ?? 0) >= 0} />
+          </div>
+          <div style={healthFolderStyle}>Import folder: {health?.importFolder || offlineFolder || 'offline-import'}</div>
+        </section>
+
+        <section className="admin-main-grid" style={{ ...mainGridStyle, order: 3 }}>
+          <div className="glass-panel" style={{ ...panelStyle, order: 2 }}>
             <div style={sectionHeaderStyle}>
               <div>
                 <h2 style={sectionTitleStyle}>Users</h2>
@@ -330,7 +369,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          <div className="glass-panel" style={panelStyle}>
+          <div className="glass-panel" style={{ ...panelStyle, gridColumn: '1 / -1', order: 1 }}>
             <div style={sectionHeaderStyle}>
               <div>
                 <h2 style={sectionTitleStyle}>{currentUser ? `${currentUser.username} details` : 'User details'}</h2>
@@ -363,6 +402,8 @@ const AdminDashboard = () => {
                   <MiniStat icon={<CheckCircle2 size={18} />} label="Can play" value={currentUser.playableMovieCount ?? unique(currentUser.moviesCanWatch).length} />
                   <MiniStat icon={<Clock3 size={18} />} label="Play events" value={currentUser.totalWatchEvents ?? unique(currentUser.watchedMovies).length} />
                   <MiniStat icon={<Bookmark size={18} />} label="Watchlist" value={currentUser.watchlistMovieCount ?? unique(currentUser.watchlistMovies).length} />
+                  <MiniStat icon={<Activity size={18} />} label="Liked" value={currentUser.likedMovieCount ?? unique(currentUser.likedMovies).length} />
+                  <MiniStat icon={<X size={18} />} label="Disliked" value={currentUser.dislikedMovieCount ?? unique(currentUser.dislikedMovies).length} />
                 </div>
 
                 <ActivityList
@@ -381,6 +422,16 @@ const AdminDashboard = () => {
                   items={unique(currentUser.watchlistMovies)}
                   empty="No watchlist movies yet."
                 />
+                <ActivityList
+                  title="Liked movies"
+                  items={unique(currentUser.likedMovies)}
+                  empty="No liked movies yet."
+                />
+                <ActivityList
+                  title="Disliked movies"
+                  items={unique(currentUser.dislikedMovies)}
+                  empty="No disliked movies yet."
+                />
               </div>
             ) : (
               <p style={mutedTextStyle}>Select a user to view details.</p>
@@ -388,12 +439,38 @@ const AdminDashboard = () => {
           </div>
         </section>
 
-        <section className="admin-secondary-grid" style={secondaryGridStyle}>
-          <div className="glass-panel" style={panelStyle}>
+        <section className="admin-secondary-grid" style={{ ...secondaryGridStyle, order: 2 }}>
+          <div className="glass-panel" style={{ ...panelStyle, order: 3 }}>
+            <div style={sectionHeaderStyle}>
+              <div>
+                <h2 style={sectionTitleStyle}>Recent Feedback</h2>
+                <p style={mutedTextStyle}>Latest Like and Dislike clicks from users.</p>
+              </div>
+            </div>
+            <div style={feedbackListStyle}>
+              {feedbackEvents.length === 0 ? (
+                <p style={emptyTextStyle}>No feedback events yet. Click Like or Not for me on any movie, then refresh activity.</p>
+              ) : (
+                feedbackEvents.map((event) => (
+                  <div key={event.id} style={feedbackRowStyle}>
+                    <span style={event.eventType === 'LIKE' ? feedbackLikeStyle : feedbackDislikeStyle}>
+                      {event.eventType === 'LIKE' ? 'LIKE' : 'DISLIKE'}
+                    </span>
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={feedbackTitleStyle}>{event.movieTitle}</span>
+                      <span style={feedbackMetaStyle}>{event.username} - {event.context || 'movie'}</span>
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="glass-panel" style={{ ...panelStyle, order: 1, gridColumn: '1 / -1' }}>
             <div style={sectionHeaderStyle}>
               <div>
                 <h2 style={sectionTitleStyle}>Movie Library</h2>
-                <p style={mutedTextStyle}>Add, edit, test playback, or remove catalog items.</p>
+                <p style={mutedTextStyle}>Your main admin workspace for adding movies, testing playback, and checking local MP4 status.</p>
               </div>
               <button type="button" className="btn-secondary" onClick={startNewMovie} style={smallActionButtonStyle}>
                 <Plus size={17} />
@@ -435,29 +512,33 @@ const AdminDashboard = () => {
             )}
 
             <div style={movieGridStyle}>
-              {movies.map((movie) => (
-                <article key={movie.id} style={movieCardStyle}>
-                  <img src={resolveMediaUrl(movie.thumbnailUrl)} alt="" style={posterStyle} />
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <h3 style={movieTitleStyle}>{movie.title}</h3>
-                    <p style={movieMetaStyle}>{movie.genre || 'General'} - Rating {formatRating(movie.rating)}</p>
-                    <span style={movieStatusStyle}>{movie.videoUrl ? 'Ready to test' : 'No video linked'}</span>
-                  </div>
-                  <button type="button" title="Play" style={iconButtonStyle} onClick={() => navigate(`/watch/${movie.id}`)}>
-                    <Play size={17} />
-                  </button>
-                  <button type="button" title="Edit" style={iconButtonStyle} onClick={() => startEditMovie(movie)}>
-                    <Edit3 size={17} />
-                  </button>
-                  <button type="button" title="Delete" style={dangerIconButtonStyle} onClick={() => handleDelete(movie.id, movie.title)}>
-                    <Trash2 size={17} />
-                  </button>
-                </article>
-              ))}
+              {movies.map((movie) => {
+                const status = movieVideoStatus(movie);
+                return (
+                  <article key={movie.id} style={movieCardStyle}>
+                    <img src={resolveMediaUrl(movie.thumbnailUrl)} alt="" style={posterStyle} />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <h3 style={movieTitleStyle}>{movie.title}</h3>
+                      <p style={movieMetaStyle}>{movie.genre || 'General'} - Rating {formatRating(movie.rating)}</p>
+                      <span style={{ ...movieStatusStyle, color: status.color }}>{status.label}</span>
+                      <span style={movieStatusDetailStyle}>{status.detail}</span>
+                    </div>
+                    <button type="button" title="Play" style={iconButtonStyle} onClick={() => navigate(`/watch/${movie.id}`)}>
+                      <Play size={17} />
+                    </button>
+                    <button type="button" title="Edit" style={iconButtonStyle} onClick={() => startEditMovie(movie)}>
+                      <Edit3 size={17} />
+                    </button>
+                    <button type="button" title="Delete" style={dangerIconButtonStyle} onClick={() => handleDelete(movie.id, movie.title)}>
+                      <Trash2 size={17} />
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </div>
 
-          <div className="glass-panel" style={panelStyle}>
+          <div className="glass-panel" style={{ ...panelStyle, order: 2 }}>
             <div style={sectionHeaderStyle}>
               <div>
                 <h2 style={sectionTitleStyle}>Import Folder</h2>
@@ -542,6 +623,16 @@ const MiniStat = ({ icon, label, value }) => (
   </div>
 );
 
+const HealthChip = ({ label, value, ok }) => (
+  <div style={healthChipStyle}>
+    <span style={ok ? healthDotOkStyle : healthDotBadStyle} />
+    <span>
+      <span style={healthLabelStyle}>{label}</span>
+      <span style={healthValueStyle}>{value}</span>
+    </span>
+  </div>
+);
+
 const Alert = ({ type, children }) => (
   <div style={{
     background: type === 'success' ? '#2f9e44' : 'var(--netflix-red)',
@@ -579,16 +670,55 @@ const emptyMovieForm = () => ({
 });
 
 const unique = (items = []) => [...new Set((items || []).filter(Boolean))];
+const normalizeKey = (value = '') => String(value).trim().replace(/\s+/g, ' ').toLowerCase();
+const uniqueBy = (items, getKey) => {
+  const seen = new Set();
+  return (items || []).filter((item) => {
+    const key = getKey(item);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+const uniqueByMovie = (items = []) => uniqueBy(items, (movie) => normalizeKey(movie.title) || String(movie.id || ''));
+const uniqueByUser = (items = []) => uniqueBy(items, (user) => normalizeKey(user.username) || String(user.id || ''));
+const uniqueFeedback = (items = []) => uniqueBy(
+  items,
+  (event) => `${normalizeKey(event.username)}-${normalizeKey(event.movieTitle)}-${event.eventType}`
+);
 const userKey = (user) => user?.id ? String(user.id) : user?.username || '';
 const initials = (name = 'U') => name.slice(0, 2).toUpperCase();
 const formatRating = (rating) => Number.isFinite(Number(rating)) ? Number(rating).toFixed(1) : 'N/A';
+const movieVideoStatus = (movie) => {
+  const videoUrl = movie.videoUrl || '';
+  const fileName = decodeURIComponent(videoUrl.split('/').pop() || '').slice(0, 46);
+  if (videoUrl.startsWith('/uploads/videos/')) {
+    return { label: 'Local MP4 linked', detail: fileName || 'Uploaded file', color: '#46d369' };
+  }
+  if (videoUrl.includes('commondatastorage.googleapis.com')) {
+    return { label: 'Demo fallback', detail: 'Local demo overrides this when present', color: '#f5c542' };
+  }
+  if (videoUrl) {
+    return { label: 'External video URL', detail: fileName || 'Remote stream', color: '#7fdbff' };
+  }
+  return { label: 'Needs local MP4', detail: 'Copy file to offline-import, then Sync Movies', color: '#ff8a8a' };
+};
 
 const headerStyle = { display: 'flex', justifyContent: 'space-between', gap: 20, alignItems: 'flex-end', marginBottom: 22 };
+const headerActionsStyle = { display: 'flex', gap: 12, alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' };
 const eyebrowStyle = { color: 'var(--netflix-red)', textTransform: 'uppercase', fontSize: '0.74rem', fontWeight: 800, letterSpacing: 0, margin: '0 0 8px' };
 const titleStyle = { fontSize: '2.35rem', lineHeight: 1.05, margin: 0, fontWeight: 900 };
 const subtitleStyle = { color: '#9a9a9a', margin: '10px 0 0', maxWidth: 720, lineHeight: 1.5 };
 const syncButtonStyle = { height: 46, minWidth: 150, justifyContent: 'center', gap: 9 };
 const statsGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 14, marginBottom: 18 };
+const healthPanelStyle = { order: 1.5, padding: 18, borderRadius: 8, marginBottom: 18, display: 'grid', gap: 14 };
+const healthGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 };
+const healthChipStyle = { display: 'flex', alignItems: 'center', gap: 10, background: '#101010', border: '1px solid #282828', borderRadius: 8, padding: 12 };
+const healthDotOkStyle = { width: 10, height: 10, borderRadius: '50%', background: '#46d369', boxShadow: '0 0 0 4px rgba(70,211,105,0.12)', flexShrink: 0 };
+const healthDotBadStyle = { ...healthDotOkStyle, background: '#ff5a5f', boxShadow: '0 0 0 4px rgba(255,90,95,0.12)' };
+const healthLabelStyle = { display: 'block', color: '#888', fontSize: '0.73rem', fontWeight: 900, textTransform: 'uppercase' };
+const healthValueStyle = { display: 'block', color: '#fff', fontWeight: 900, marginTop: 2, fontSize: '0.9rem' };
+const healthFolderStyle = { color: '#8f8f8f', fontSize: '0.82rem', fontFamily: 'monospace', background: '#0b0b0b', border: '1px solid #252525', borderRadius: 6, padding: 10, wordBreak: 'break-all' };
 const mainGridStyle = { display: 'grid', gridTemplateColumns: '0.9fr 1.1fr', gap: 18, marginBottom: 18 };
 const secondaryGridStyle = { display: 'grid', gridTemplateColumns: '1.35fr 0.65fr', gap: 18 };
 const panelStyle = { padding: 22, borderRadius: 8 };
@@ -609,7 +739,7 @@ const userMetaStyle = { display: 'block', color: '#8e8e8e', fontSize: '0.82rem',
 const activityBadgeStyle = { color: '#fff', background: '#242424', border: '1px solid #333', borderRadius: 999, padding: '5px 8px', fontSize: '0.75rem', whiteSpace: 'nowrap' };
 const rolePillStyle = { border: '1px solid rgba(229,9,20,0.55)', color: '#fff', borderRadius: 999, padding: '5px 10px', fontSize: '0.76rem', fontWeight: 800 };
 const dangerUserButtonStyle = { height: 32, borderRadius: 6, border: '1px solid rgba(229,9,20,0.5)', background: 'rgba(229,9,20,0.12)', color: '#fff', display: 'inline-flex', alignItems: 'center', gap: 7, padding: '0 10px', fontWeight: 800, fontSize: '0.78rem' };
-const miniStatsStyle = { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10 };
+const miniStatsStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 };
 const miniStatStyle = { display: 'flex', gap: 9, alignItems: 'center', background: '#111', border: '1px solid #282828', borderRadius: 8, padding: 12 };
 const miniValueStyle = { display: 'block', fontWeight: 900, color: '#fff', lineHeight: 1 };
 const miniLabelStyle = { display: 'block', color: '#858585', fontSize: '0.75rem', marginTop: 3 };
@@ -618,18 +748,25 @@ const emptyTextStyle = { color: '#777', margin: 0, fontSize: '0.88rem' };
 const chipWrapStyle = { display: 'flex', flexWrap: 'wrap', gap: 8 };
 const chipStyle = { background: '#191919', border: '1px solid #303030', borderRadius: 999, padding: '7px 10px', color: '#ddd', fontSize: '0.82rem', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const chipMutedStyle = { ...chipStyle, color: '#999', borderStyle: 'dashed' };
-const movieGridStyle = { display: 'grid', gap: 10, maxHeight: 520, overflow: 'auto', paddingRight: 4 };
-const movieCardStyle = { display: 'flex', alignItems: 'center', gap: 12, background: '#111', border: '1px solid #272727', borderRadius: 8, padding: 10 };
-const posterStyle = { width: 42, height: 58, borderRadius: 4, objectFit: 'cover', flexShrink: 0, background: '#222' };
-const movieTitleStyle = { margin: 0, fontSize: '0.94rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const movieGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, maxHeight: 560, overflow: 'auto', paddingRight: 4 };
+const movieCardStyle = { display: 'flex', alignItems: 'center', gap: 14, background: 'linear-gradient(180deg, #141414, #0f0f0f)', border: '1px solid #2d2d2d', borderRadius: 8, padding: 12 };
+const posterStyle = { width: 54, height: 74, borderRadius: 5, objectFit: 'cover', flexShrink: 0, background: '#222' };
+const movieTitleStyle = { margin: 0, fontSize: '1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const movieMetaStyle = { margin: '4px 0', color: '#858585', fontSize: '0.8rem' };
 const movieStatusStyle = { color: '#46d369', fontSize: '0.76rem' };
+const movieStatusDetailStyle = { display: 'block', color: '#777', fontSize: '0.72rem', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const iconButtonStyle = { width: 34, height: 34, borderRadius: 6, border: '1px solid #333', background: '#1c1c1c', color: '#fff', display: 'grid', placeItems: 'center', cursor: 'pointer', flexShrink: 0 };
 const dangerIconButtonStyle = { ...iconButtonStyle, color: 'var(--netflix-red)' };
 const folderBoxStyle = { background: '#0d0d0d', color: '#7fdbff', border: '1px solid #252525', borderRadius: 6, padding: 12, fontFamily: 'monospace', fontSize: '0.83rem', wordBreak: 'break-all', marginBottom: 14 };
 const compactStepsStyle = { display: 'grid', gap: 11, marginBottom: 14 };
 const stepDotStyle = { width: 24, height: 24, borderRadius: '50%', background: 'var(--netflix-red)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: '0.76rem', fontWeight: 900, flexShrink: 0 };
 const logBoxStyle = { display: 'grid', gap: 7, background: '#0f0f0f', border: '1px solid #292929', borderRadius: 6, padding: 12, color: '#aaa', fontSize: '0.84rem', lineHeight: 1.4 };
+const feedbackListStyle = { display: 'grid', gap: 10, maxHeight: 360, overflow: 'auto', paddingRight: 4 };
+const feedbackRowStyle = { display: 'flex', alignItems: 'center', gap: 10, background: '#111', border: '1px solid #292929', borderRadius: 8, padding: 10 };
+const feedbackLikeStyle = { color: '#46d369', border: '1px solid rgba(70,211,105,0.45)', background: 'rgba(70,211,105,0.12)', borderRadius: 999, padding: '5px 8px', fontSize: '0.7rem', fontWeight: 900 };
+const feedbackDislikeStyle = { color: '#ff8a8a', border: '1px solid rgba(255,138,138,0.45)', background: 'rgba(255,138,138,0.12)', borderRadius: 999, padding: '5px 8px', fontSize: '0.7rem', fontWeight: 900 };
+const feedbackTitleStyle = { display: 'block', color: '#fff', fontWeight: 800, fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const feedbackMetaStyle = { display: 'block', color: '#888', fontSize: '0.76rem', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const smallActionButtonStyle = { minHeight: 36, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '0 12px', whiteSpace: 'nowrap' };
 const movieFormStyle = { display: 'grid', gap: 10, background: '#0e0e0e', border: '1px solid #292929', borderRadius: 8, padding: 14, marginBottom: 14 };
 const formGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 };
