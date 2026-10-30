@@ -1,6 +1,11 @@
+const DEPLOYED_BACKEND_ORIGIN = 'https://netflix-backend-k3mu.onrender.com';
+
 function origin() {
   if (import.meta.env.VITE_API_ORIGIN) {
     return import.meta.env.VITE_API_ORIGIN;
+  }
+  if (import.meta.env.PROD) {
+    return DEPLOYED_BACKEND_ORIGIN;
   }
   if (typeof window !== 'undefined') {
     return window.location.origin;

@@ -1,9 +1,14 @@
 import axios from 'axios';
 
 /** Same host as the page (works for localhost:3000 and LAN IP like 192.168.x.x:3000) */
+const DEPLOYED_BACKEND_ORIGIN = 'https://netflix-backend-k3mu.onrender.com';
+
 function getApiBaseUrl() {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
+  }
+  if (import.meta.env.PROD) {
+    return `${DEPLOYED_BACKEND_ORIGIN}/api`;
   }
   if (typeof window !== 'undefined') {
     return `${window.location.origin}/api`;
